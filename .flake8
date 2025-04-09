@@ -1,0 +1,4 @@
+[flake8]
+max-line-length = 120
+# space before : (needed for how black formats slicing)
+extend-ignore = E203

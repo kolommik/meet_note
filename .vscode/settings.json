@@ -1,0 +1,32 @@
+{
+    "python.linting.enabled": true,
+    "python.linting.mypyEnabled": true,
+    "python.linting.pylintEnabled": true,
+    "python.linting.flake8Enabled": true,
+    "python.formatting.provider": "black",
+    "python.linting.mypyArgs": [
+        "--ignore-missing-imports",
+        "--follow-imports=silent",
+        "--show-column-numbers",
+        "--strict"
+    ],
+    
+    "python.pythonPath": ".venv\\Scripts\\python.exe",
+    "python.analysis.extraPaths": [
+        ".venv/lib/site-packages"
+    ],
+    "python.envFile": "${workspaceFolder}/.env",
+
+    "python.formatting.blackArgs": [
+        "--line-length",
+        "120"
+    ],
+
+    "python.linting.flake8Args": [
+        "--max-line-length=120"
+    ],
+
+    "editor.rulers": [
+        120
+    ],
+}
