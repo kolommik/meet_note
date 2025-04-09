@@ -10,6 +10,8 @@ package-mode = false
 python = "^3.10"
 python-dotenv = "^1.1.0"
 streamlit = "^1.44.1"
+openai = "^1.72.0"
+anthropic = "^0.49.0"
 
 
 [tool.poetry.group.dev.dependencies]

@@ -2,32 +2,45 @@ import streamlit as st
 from ui.components import file_upload_section
 from ui.sidebar import setup_sidebar
 from utils.logger import log_info
+from utils.error_handler import safe_operation, ErrorType
+from utils.config import init_streamlit_config
 
 
 def main():
-    # Настраиваем страницу
-    st.set_page_config(
-        page_title="MP3 File Processor",
-        page_icon="🎵",
-        layout="wide",
-        initial_sidebar_state="expanded",
-    )
+    """Основная функция приложения"""
 
-    # Логируем запуск приложения
-    log_info("Application started")
+    def _setup_app():
+        # Настраиваем страницу
+        st.set_page_config(
+            page_title="Meet Note",
+            page_icon="✍️",
+            layout="wide",
+            initial_sidebar_state="expanded",
+        )
 
-    try:
-        # Настраиваем сайдбар с отладочной панелью
+        # Логируем запуск приложения только при первом запуске
+        if "app_initialized" not in st.session_state:
+            log_info("Application started")
+            st.session_state.app_initialized = True
+
+        # Инициализируем конфигурацию только если её нет
+        if "config" not in st.session_state:
+            init_streamlit_config()
+            log_info("Конфигурация приложения инициализирована")
+
+        # Настраиваем сайдбар и основной контент
         setup_sidebar()
-
-        # Основная секция для загрузки файла
         file_upload_section()
 
-    except KeyboardInterrupt:
-        log_info("Application stopped")
-    except Exception as e:
-        st.error(f"An error occurred: {str(e)}")
-        log_info(f"Error: {str(e)}")
+        return True
+
+    # Используем safe_operation для обработки ошибок
+    safe_operation(
+        _setup_app,
+        ErrorType.UNKNOWN_ERROR,
+        operation_name="Инициализация приложения",
+        show_ui_error=True,
+    )
 
 
 if __name__ == "__main__":
