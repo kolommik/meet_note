@@ -93,6 +93,7 @@ def display_llm_selector(
 ) -> Tuple[Optional[str], Optional[str], Optional[Any]]:
     """
     Отображает UI для выбора провайдера LLM и модели.
+    Эта функция используется только если в sidebar не выбраны настройки LLM.
 
     Args:
         available_providers: Список доступных провайдеров
@@ -105,6 +106,10 @@ def display_llm_selector(
         st.warning("Не найдено доступных провайдеров LLM. Проверьте файл .env")
         return None, None, None
 
+    st.info(
+        "Рекомендуется настроить LLM в боковой панели (меню 'Настройки моделей LLM')"
+    )
+
     # Выбор стратегии LLM из доступных провайдеров
     llm_provider = st.selectbox(
         "Выберите провайдера LLM", available_providers, key=f"{key_prefix}llm_provider"
@@ -116,7 +121,6 @@ def display_llm_selector(
 
     # Инициализируем выбранную стратегию
     try:
-
         # Если конфигурация не инициализирована в session_state, инициализируем
         if "config" not in st.session_state:
             init_streamlit_config()
@@ -145,6 +149,14 @@ def display_llm_selector(
         model_name = st.selectbox(
             "Выберите модель", model_options, key=f"{key_prefix}llm_model"
         )
+
+        # Отображаем текущие настройки из sidebar, если они установлены
+        if "llm_settings" in st.session_state:
+            st.info(
+                f"Настройки модели:\n"
+                f"- Температура: {st.session_state.llm_settings.get('temperature', 0.0)}\n"
+                f"- Макс. токенов: {st.session_state.llm_settings.get('max_tokens', 1024)}"
+            )
 
         return llm_provider, model_name, llm_strategy
 

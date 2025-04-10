@@ -43,6 +43,10 @@ def initialize_app_state():
     if "analysis_results" not in st.session_state:
         st.session_state.analysis_results = None
 
+    # Инициализируем настройки LLM, если они еще не установлены
+    if "llm_settings" not in st.session_state:
+        st.session_state.llm_settings = {"temperature": 0.0, "max_tokens": 1024}
+
     # Инициализируем переменные для статистики LLM
     if "llm_stats" not in st.session_state:
         st.session_state.llm_stats = {
@@ -75,6 +79,17 @@ def handle_file_upload(uploaded_file):
             st.session_state.file_path = file_path
             st.session_state.file_size = file_size
             st.session_state.file_status = "uploaded"
+
+            # Автоматически запускаем распознавание речи
+            log_info("Автоматический запуск распознавания речи")
+            transcription_result = safe_operation(
+                transcribe_audio,
+                ErrorType.TRANSCRIPTION_ERROR,
+                file_path=file_path,
+            )
+
+            if transcription_result:
+                st.session_state.file_status = "transcribed"
 
             # Обновляем страницу для отображения изменений
             st.rerun()
@@ -172,23 +187,47 @@ def analyze_transcript(transcript_text):
     # Отображаем секцию для анализа с помощью LLM
     st.subheader("Анализ с помощью LLM")
 
-    # Если конфигурация не инициализирована в session_state, инициализируем
-    if "config" not in st.session_state:
-        init_streamlit_config()
+    # Используем настройки из сайдбара, если они установлены
+    llm_provider = None
+    model_name = None
+    llm_strategy = None
 
-    config = st.session_state.config
+    if (
+        "llm_settings" in st.session_state
+        and st.session_state.llm_settings.get("provider")
+        and st.session_state.llm_settings.get("model")
+    ):
+        llm_provider = st.session_state.llm_settings.get("provider")
+        model_name = st.session_state.llm_settings.get("model")
+        llm_strategy = st.session_state.llm_settings.get("strategy")
 
-    # Определяем доступных провайдеров из конфигурации
-    available_providers = config.available_providers
+        # Отображаем информацию о выбранных настройках
+        st.info(
+            f"Используем настройки из боковой панели:\n"
+            f"- Провайдер: {llm_provider}\n"
+            f"- Модель: {model_name}\n"
+            f"- Температура: {st.session_state.llm_settings.get('temperature', 0.0)}\n"
+            f"- Макс. токенов: {st.session_state.llm_settings.get('max_tokens', 1024)}"
+        )
+    else:
+        # Если настройки не установлены, используем ui_components
+        # Если конфигурация не инициализирована в session_state, инициализируем
+        if "config" not in st.session_state:
+            init_streamlit_config()
 
-    if not available_providers:
-        st.warning("Не найдено доступных провайдеров LLM. Проверьте файл .env")
-        return
+        config = st.session_state.config
 
-    # Используем компонент из ui_components
-    llm_provider, model_name, llm_strategy = display_llm_selector(
-        available_providers, key_prefix="analysis_"
-    )
+        # Определяем доступных провайдеров из конфигурации
+        available_providers = config.available_providers
+
+        if not available_providers:
+            st.warning("Не найдено доступных провайдеров LLM. Проверьте файл .env")
+            return
+
+        # Используем компонент из ui_components для выбора модели
+        llm_provider, model_name, llm_strategy = display_llm_selector(
+            available_providers, key_prefix="analysis_"
+        )
 
     if llm_strategy:
         # Кнопка для запуска анализа с помощью LLM
@@ -196,33 +235,54 @@ def analyze_transcript(transcript_text):
             with st.spinner("Анализ разговора с помощью LLM..."):
 
                 def _analyze_with_llm():
+                    # Получаем настройки LLM из session_state или используем значения по умолчанию
+                    temperature = st.session_state.llm_settings.get("temperature", 0.0)
+                    max_tokens = st.session_state.llm_settings.get("max_tokens", 1024)
+
                     log_info(
-                        "Начинаем анализ транскрипции с помощью "
-                        + llm_provider
-                        + ", модель "
-                        + model_name
+                        f"Начинаем анализ транскрипции с помощью "
+                        f"{llm_provider}, модель {model_name}, "
+                        f"параметры: temp={temperature}, max_tokens={max_tokens}"
                     )
 
-                    # Запускаем анализ с помощью LLM
+                    # Запускаем анализ с помощью LLM с параметрами из настроек
                     analysis_results = identify_speakers_with_llm(
                         transcript_text=transcript_text,
                         speaker_stats=speaker_stats,
                         llm_strategy=llm_strategy,
                         model_name=model_name,
-                        max_tokens=4096,  # Увеличиваем максимальное количество токенов для ответа
+                        temperature=temperature,
+                        max_tokens=max_tokens,
                     )
                     log_info("Анализ завершен успешно")
 
                     # Сохраняем результаты анализа в сессии
                     st.session_state.analysis_results = analysis_results
 
+                    # Данные о стоимости для текущего запроса
+                    current_input_tokens = llm_strategy.get_input_tokens()
+                    current_output_tokens = llm_strategy.get_output_tokens()
+                    current_price = llm_strategy.get_full_price()
+
+                    # Обновляем общую статистику за сессию
+                    if "total_llm_cost" not in st.session_state:
+                        st.session_state.total_llm_cost = 0.0
+                        st.session_state.total_input_tokens = 0
+                        st.session_state.total_output_tokens = 0
+                        st.session_state.total_calls = 0
+
+                    st.session_state.total_llm_cost += current_price
+                    st.session_state.total_input_tokens += current_input_tokens
+                    st.session_state.total_output_tokens += current_output_tokens
+                    st.session_state.total_calls += 1
+
                     # Сохраняем статистику использования модели
                     st.session_state.llm_stats = {
-                        "input_tokens": llm_strategy.get_input_tokens(),
-                        "output_tokens": llm_strategy.get_output_tokens(),
+                        "input_tokens": current_input_tokens,
+                        "output_tokens": current_output_tokens,
                         "cache_create_tokens": llm_strategy.get_cache_create_tokens(),
                         "cache_read_tokens": llm_strategy.get_cache_read_tokens(),
-                        "full_price": llm_strategy.get_full_price(),
+                        "full_price": current_price,
                         "model": model_name,
                         "provider": llm_provider,
                     }
@@ -243,7 +303,9 @@ def analyze_transcript(transcript_text):
                     # Используем компонент из ui_components для отображения результатов
                     display_analysis_results(analysis_results)
     else:
-        st.info("Для анализа транскрипции укажите API ключ и выберите модель LLM")
+        st.info(
+            "Для анализа транскрипции укажите настройки LLM в боковой панели или выберите модель выше"
+        )
 
 
 def file_upload_section():
@@ -314,32 +376,30 @@ def file_upload_section():
 
             copy_button(transcript_text)
 
-            # Создаем вкладки для основного контента и анализа
-            tab1, tab2 = st.tabs(["Скачать и управлять", "Анализ транскрипции"])
+            # Добавляем кнопку для скачивания файла
+            with open(transcript_path, "rb") as file:
+                st.download_button(
+                    label="Скачать файл транскрипции",
+                    data=file,
+                    file_name=os.path.basename(transcript_path),
+                    mime="text/plain",
+                    key="download_transcript_button",
+                )
 
-            with tab1:
-                # Добавляем кнопки для скачивания файла и удаления файлов
-                col1, col2 = st.columns(2)
+            # Добавляем разделитель
+            st.markdown("---")
 
-                with col1:
-                    # Кнопка скачивания файла транскрипции
-                    with open(transcript_path, "rb") as file:
-                        st.download_button(
-                            label="Скачать файл транскрипции",
-                            data=file,
-                            file_name=os.path.basename(transcript_path),
-                            mime="text/plain",
-                            key="download_transcript_button",
-                        )
+            # Запускаем анализ транскрипции
+            analyze_transcript(transcript_text)
 
-                with col2:
-                    # Кнопка удаления файлов
-                    if st.button("Удалить все файлы", key="delete_files_button"):
-                        handle_delete_files()
+            # Добавляем разделитель перед кнопкой удаления
+            st.markdown("---")
 
-            with tab2:
-                # Запускаем анализ транскрипции
-                analyze_transcript(transcript_text)
+            # Размещаем кнопку удаления в самом низу
+            if st.button(
+                "Удалить все файлы", key="delete_files_button", type="primary"
+            ):
+                handle_delete_files()
 
         else:
             st.warning("Файл с результатами распознавания не найден.")

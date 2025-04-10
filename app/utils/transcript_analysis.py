@@ -141,7 +141,7 @@ def _identify_speakers_with_llm_impl(
         stats_text=stats_text, transcript_text=transcript_text
     )
 
-    # Отправляем запрос к LLM
+    # Отправляем запрос к LLM с указанными параметрами
     response = llm_strategy.send_message(
         system_prompt=system_prompt,
         messages=[{"role": "user", "content": user_message}],

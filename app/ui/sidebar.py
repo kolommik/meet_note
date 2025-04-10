@@ -8,7 +8,12 @@ def reset_app_state():
 
     def _reset_app_state_impl():
         # Список ключей, которые нужно сохранить (например, настройки)
-        keys_to_preserve = ["auto_refresh", "refresh_interval", "config"]
+        keys_to_preserve = [
+            "auto_refresh",
+            "refresh_interval",
+            "config",
+            "llm_settings",
+        ]
 
         # Сохраняем значения, которые нужно сохранить
         preserved_values = {}
@@ -39,6 +44,177 @@ def reset_app_state():
         operation_name="Сброс состояния приложения",
         show_ui_error=True,
     )
+
+
+def display_llm_settings():
+    """Отображение панели настроек моделей LLM"""
+    if st.sidebar.toggle(
+        "Настройки моделей LLM", value=True, key="llm_settings_toggle"
+    ):
+        st.sidebar.subheader("Настройки моделей LLM")
+
+        # Если настройки еще не инициализированы, создаем их
+        if "llm_settings" not in st.session_state:
+            st.session_state.llm_settings = {
+                "temperature": 0.0,
+                "max_tokens": 1024,
+                "provider": None,
+                "model": None,
+            }
+
+        # Если конфигурация не инициализирована в session_state, инициализируем
+        if "config" not in st.session_state:
+            from utils.config import init_streamlit_config
+
+            init_streamlit_config()
+
+        config = st.session_state.config
+
+        # Определяем доступных провайдеров из конфигурации
+        available_providers = config.available_providers
+
+        if not available_providers:
+            st.sidebar.warning(
+                "Не найдено доступных провайдеров LLM. Проверьте файл .env"
+            )
+        else:
+            # Выбор провайдера LLM
+            provider = st.sidebar.selectbox(
+                "Провайдер LLM",
+                available_providers,
+                index=(
+                    available_providers.index(
+                        st.session_state.llm_settings.get(
+                            "provider", available_providers[0]
+                        )
+                    )
+                    if st.session_state.llm_settings.get("provider")
+                    in available_providers
+                    else 0
+                ),
+            )
+
+            # Сохраняем выбранного провайдера
+            st.session_state.llm_settings["provider"] = provider
+
+            # Определяем модели для выбранного провайдера
+            if provider == "Anthropic":
+                from llm_strategies.anthropic_strategy import AnthropicChatStrategy
+
+                api_key = config.anthropic_api_key
+                llm_strategy = AnthropicChatStrategy(api_key)
+            elif provider == "OpenAI":
+                from llm_strategies.openai_strategy import OpenAIChatStrategy
+
+                api_key = config.openai_api_key
+                llm_strategy = OpenAIChatStrategy(api_key)
+            else:  # Deepseek
+                from llm_strategies.deepseek_strategy import DeepseekChatStrategy
+
+                api_key = config.deepseek_api_key
+                llm_strategy = DeepseekChatStrategy(api_key)
+
+            # Получаем список моделей
+            model_options = llm_strategy.get_models()
+
+            # Выбор модели
+            model_index = 0
+            if st.session_state.llm_settings.get("model") in model_options:
+                model_index = model_options.index(
+                    st.session_state.llm_settings.get("model")
+                )
+
+            model = st.sidebar.selectbox("Модель LLM", model_options, index=model_index)
+
+            # Сохраняем выбранную модель
+            st.session_state.llm_settings["model"] = model
+
+            # Сохраняем стратегию для использования в других частях приложения
+            st.session_state.llm_settings["strategy"] = llm_strategy
+
+        # Ползунок для температуры
+        st.session_state.llm_settings["temperature"] = st.sidebar.slider(
+            "Температура",
+            min_value=0.0,
+            max_value=1.0,
+            value=st.session_state.llm_settings.get("temperature", 0.0),
+            step=0.01,
+            help="Регулирует случайность генерации. Низкие значения делают ответ более детерминированным.",
+        )
+
+        # Поле для ввода максимального количества токенов
+        st.session_state.llm_settings["max_tokens"] = st.sidebar.number_input(
+            "Макс. токенов",
+            min_value=100,
+            max_value=8192,
+            value=st.session_state.llm_settings.get("max_tokens", 1024),
+            step=100,
+            help="Максимальное количество токенов в ответе LLM",
+        )
+
+        # Отображаем текущие настройки
+        st.sidebar.info(
+            f"Текущие настройки:\n"
+            f"- Провайдер: {st.session_state.llm_settings.get('provider', 'Не выбран')}\n"
+            f"- Модель: {st.session_state.llm_settings.get('model', 'Не выбрана')}\n"
+            f"- Температура: {st.session_state.llm_settings['temperature']}\n"
+            f"- Макс. токенов: {st.session_state.llm_settings['max_tokens']}"
+        )
+
+
+def display_llm_stats():
+    """Отображение статистики использования LLM"""
+    if "llm_stats" in st.session_state and st.sidebar.toggle(
+        "Статистика LLM", value=False, key="llm_stats_toggle"
+    ):
+        stats = st.session_state.llm_stats
+
+        st.sidebar.subheader("Статистика использования LLM")
+
+        # Инициализируем отслеживание общей стоимости за сессию, если его еще нет
+        if "total_llm_cost" not in st.session_state:
+            st.session_state.total_llm_cost = 0.0
+            st.session_state.total_input_tokens = 0
+            st.session_state.total_output_tokens = 0
+            st.session_state.total_calls = 0
+
+        if stats["provider"] and stats["model"]:
+            st.sidebar.markdown("**Последний запрос:**")
+            st.sidebar.markdown(f"**Провайдер:** {stats['provider']}")
+            st.sidebar.markdown(f"**Модель:** {stats['model']}")
+
+            # Токены последнего запроса
+            st.sidebar.markdown("### Токены (последний запрос)")
+            st.sidebar.markdown(f"- Входные: {stats['input_tokens']}")
+            st.sidebar.markdown(f"- Выходные: {stats['output_tokens']}")
+            st.sidebar.markdown(
+                f"- Всего: {stats['input_tokens'] + stats['output_tokens']}"
+            )
+
+            # Кэш
+            st.sidebar.markdown("### Кэширование (последний запрос)")
+            st.sidebar.markdown(f"- Создание кэша: {stats['cache_create_tokens']}")
+            st.sidebar.markdown(f"- Чтение из кэша: {stats['cache_read_tokens']}")
+
+            # Стоимость последнего запроса
+            st.sidebar.markdown("### Стоимость (последний запрос)")
+            st.sidebar.markdown(f"- Общая: ${stats['full_price']:.6f}")
+
+            # Общая статистика за всю сессию
+            st.sidebar.markdown("---")
+            st.sidebar.markdown("## Общая статистика за сессию")
+            st.sidebar.markdown(f"- Всего запросов: {st.session_state.total_calls}")
+            st.sidebar.markdown(
+                f"- Всего входных токенов: {st.session_state.total_input_tokens}"
+            )
+            st.sidebar.markdown(
+                f"- Всего выходных токенов: {st.session_state.total_output_tokens}"
+            )
+            st.sidebar.markdown(
+                f"- **Общая стоимость**: ${st.session_state.total_llm_cost:.6f}"
+            )
+        else:
+            st.sidebar.info("Статистика LLM будет доступна после использования модели")
 
 
 def display_debug_panel():
@@ -123,8 +299,11 @@ def display_debug_panel():
 
 def setup_sidebar():
     """Настройка и инициализация сайдбара"""
+    # Добавляем настройки моделей LLM
+    display_llm_settings()
+
+    # Добавляем статистику LLM
+    display_llm_stats()
+
     # Добавляем отладочную панель
     display_debug_panel()
-
-    # Возвращаем пустые значения, так как логи не отображаются
-    return None, 0, None

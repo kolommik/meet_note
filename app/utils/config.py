@@ -107,3 +107,10 @@ def init_streamlit_config():
     import streamlit as st
 
     st.session_state.config = get_config()
+
+    # Инициализируем настройки LLM, если они еще не установлены
+    if "llm_settings" not in st.session_state:
+        st.session_state.llm_settings = {
+            "temperature": st.session_state.config.default_temperature,
+            "max_tokens": st.session_state.config.default_max_tokens,
+        }
