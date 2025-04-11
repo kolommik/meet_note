@@ -96,39 +96,6 @@ def _generate_human_readable_transcript_impl(transcript_data):
     return "\n".join(lines)
 
 
-def format_time(seconds):
-    """
-    Форматирует время в секундах в формат MM:SS.mmm
-
-    Args:
-        seconds: Время в секундах
-
-    Returns:
-        str: Отформатированное время
-    """
-    return safe_operation(
-        _format_time_impl,
-        ErrorType.UNKNOWN_ERROR,
-        seconds=seconds,
-        default_return="00:00.000",
-    )
-
-
-def _format_time_impl(seconds):
-    """
-    Внутренняя реализация форматирования времени
-
-    Args:
-        seconds: Время в секундах
-
-    Returns:
-        str: Отформатированное время
-    """
-    minutes = int(seconds // 60)
-    seconds = seconds % 60
-    return f"{minutes:02d}:{seconds:06.3f}"
-
-
 def transcribe_audio(file_path):
     """
     Отправляет аудиофайл в ElevenLabs API для распознавания речи
@@ -182,7 +149,7 @@ def _transcribe_audio_impl(file_path):
         # Дополнительные параметры для API
         data = {
             "model_id": "scribe_v1",  # Используем Scribe v1 модель
-            "detect_audio_events": "true",  # Включаем определение аудио событий, таких как смех
+            "detect_audio_events": "false",  # Выключаем определение аудио событий, таких как смех
             "diarize": "true",
         }
 
