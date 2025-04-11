@@ -181,8 +181,6 @@ class AnthropicChatStrategy(ChatModelStrategy):
                 new_message["content"][0]["cache_control"] = {"type": "ephemeral"}
             cashed_messages.append(new_message)
 
-        print(cashed_messages)
-
         response = self.client.messages.create(
             model=model_name,
             system=system_prompt,
@@ -191,8 +189,6 @@ class AnthropicChatStrategy(ChatModelStrategy):
             max_tokens=max_tokens,
             top_p=1,
         )
-
-        print(response)
 
         self.input_tokens = response.usage.input_tokens
         self.output_tokens = response.usage.output_tokens
