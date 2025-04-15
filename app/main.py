@@ -1,5 +1,5 @@
 import streamlit as st
-from ui.components import file_upload_section
+from ui.components import render_main_page
 from ui.sidebar import setup_sidebar
 from utils.logger import log_info
 from utils.error_handler import safe_operation, ErrorType
@@ -30,7 +30,7 @@ def main():
 
         # Настраиваем сайдбар и основной контент
         setup_sidebar()
-        file_upload_section()
+        render_main_page()
 
         return True
 

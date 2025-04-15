@@ -12,42 +12,38 @@ from utils.error_handler import safe_operation, ErrorType
 from ui.ui_components import (
     copy_button,
     display_file_info,
-    display_speaker_statistics,
-    display_llm_selector,
-    display_analysis_results,
 )
 from utils.transcript_analysis import (
     calculate_speaker_statistics,
     identify_speakers_with_llm,
 )
+from utils.speaker_editor import display_speaker_editor
 from utils.config import init_streamlit_config
 
 
 def initialize_app_state():
     """Инициализация состояния приложения"""
-    # Инициализируем состояние файла, если оно еще не установлено
+    # Базовые состояния
     if "file_status" not in st.session_state:
         st.session_state.file_status = "not_uploaded"
-
-    # Инициализируем пути к файлам, если они еще не установлены
     if "file_path" not in st.session_state:
         st.session_state.file_path = None
-
     if "file_size" not in st.session_state:
         st.session_state.file_size = None
 
-    # Инициализируем переменные для анализа транскрипции
+    # Состояния для транскрипции
+    if "transcript_text" not in st.session_state:
+        st.session_state.transcript_text = None
+
+    # Состояния для анализа
     if "speaker_stats" not in st.session_state:
         st.session_state.speaker_stats = None
-
     if "analysis_results" not in st.session_state:
         st.session_state.analysis_results = None
 
-    # Инициализируем настройки LLM, если они еще не установлены
+    # LLM настройки и статистика
     if "llm_settings" not in st.session_state:
         st.session_state.llm_settings = {"temperature": 0.0, "max_tokens": 1024}
-
-    # Инициализируем переменные для статистики LLM
     if "llm_stats" not in st.session_state:
         st.session_state.llm_stats = {
             "input_tokens": 0,
@@ -58,312 +54,139 @@ def initialize_app_state():
             "model": None,
             "provider": None,
         }
-
     # Инициализируем конфигурацию, если она еще не установлена
     if "config" not in st.session_state:
         init_streamlit_config()
 
 
-def handle_file_upload(uploaded_file):
-    """Обработка загрузки файла"""
-    with st.spinner("Обработка файла..."):
-        # Используем safe_operation для обработки ошибок
-        file_result = safe_operation(
-            save_uploaded_file, ErrorType.FILE_ERROR, uploaded_file=uploaded_file
-        )
-
-        if file_result:
-            file_path, file_size = file_result
-
-            # Сохраняем информацию о файле в состоянии
-            st.session_state.file_path = file_path
-            st.session_state.file_size = file_size
-            st.session_state.file_status = "uploaded"
-
-            # Автоматически запускаем распознавание речи
-            log_info("Автоматический запуск распознавания речи")
-            transcription_result = safe_operation(
-                transcribe_audio,
-                ErrorType.TRANSCRIPTION_ERROR,
-                file_path=file_path,
-            )
-
-            if transcription_result:
-                st.session_state.file_status = "transcribed"
-
-            # Обновляем страницу для отображения изменений
-            st.rerun()
+def update_state(key, value):
+    """Обновление состояния приложения"""
+    st.session_state[key] = value
 
 
-def handle_transcription():
-    """Обработка распознавания речи"""
-    if st.session_state.file_path:
-        with st.spinner("Распознавание речи..."):
-            # Используем safe_operation для обработки ошибок
-            transcription_result = safe_operation(
-                transcribe_audio,
-                ErrorType.TRANSCRIPTION_ERROR,
-                file_path=st.session_state.file_path,
-            )
-
-            if transcription_result:
-                st.session_state.file_status = "transcribed"
-                st.rerun()
-    else:
-        st.error("Файл не найден. Загрузите файл перед распознаванием.")
+def get_state(key, default=None):
+    """Получение значения из состояния приложения"""
+    return st.session_state.get(key, default)
 
 
-def handle_delete_files():
-    """Удаление всех файлов"""
-    if st.session_state.file_path:
+def clear_state():
+    """Очистка всего состояния приложения"""
+    keys_to_clear = [
+        "file_status",
+        "file_path",
+        "file_size",
+        "transcript_text",
+        "speaker_stats",
+        "analysis_results",
+    ]
+    for key in keys_to_clear:
+        if key in st.session_state:
+            del st.session_state[key]
 
-        def _delete_files_impl():
-            # Получаем путь к файлу транскрипции текст и json
-            transcript_path = get_transcript_file_path(st.session_state.file_path)
-            # Получаем путь к файлу транскрипции
-            json_transcript_path = get_json_transcript_file_path(
-                st.session_state.file_path
-            )
-
-            # Удаляем аудиофайл
-            if os.path.exists(st.session_state.file_path):
-                os.remove(st.session_state.file_path)
-
-            # Удаляем файл транскрипции
-            if os.path.exists(transcript_path):
-                os.remove(transcript_path)
-
-            # Удаляем файл транскрипции
-            if os.path.exists(json_transcript_path):
-                os.remove(json_transcript_path)
-
-            # Обновляем состояние
-            st.session_state.file_status = "not_uploaded"
-            st.session_state.file_path = None
-            st.session_state.file_size = None
-            st.session_state.speaker_stats = None
-            st.session_state.analysis_results = None
-            st.session_state.llm_stats = {
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "cache_create_tokens": 0,
-                "cache_read_tokens": 0,
-                "full_price": 0.0,
-                "model": None,
-                "provider": None,
-            }
-
-            log_info(
-                f"Файлы удалены: {st.session_state.file_path}, {transcript_path}, {json_transcript_path}"
-            )
-            return True
-
-        # Используем safe_operation для обработки ошибок
-        result = safe_operation(
-            _delete_files_impl, ErrorType.FILE_ERROR, operation_name="Удаление файлов"
-        )
-
-        if result:
-            # Обновляем страницу
-            st.rerun()
+    # Возвращаем к начальному состоянию
+    st.session_state.file_status = "not_uploaded"
 
 
-def analyze_transcript(transcript_text):
-    """
-    Анализирует транскрипцию и отображает статистику по спикерам
+def render_upload_controls():
+    """Отрисовка элементов управления загрузки файла"""
+    st.subheader("Загрузка аудиофайла")
 
-    Args:
-        transcript_text: Текст транскрипции
-    """
-    # Подсчитываем статистику спикеров
-    with st.spinner("Подсчет статистики спикеров..."):
-        speaker_stats = calculate_speaker_statistics(transcript_text)
-        st.session_state.speaker_stats = speaker_stats
+    # Создаем загрузчик файлов
+    uploaded_file = st.file_uploader("Выберите MP3 файл", type=["mp3"])
 
-    # Отображаем базовую статистику используя компонент из ui_components
-    st.subheader("Статистика спикеров")
-    display_speaker_statistics(speaker_stats)
+    if uploaded_file is not None:
+        # Отображаем информацию о загружаемом файле
+        st.write(f"Файл: {uploaded_file.name}")
 
-    # Отображаем секцию для анализа с помощью LLM
-    st.subheader("Анализ с помощью LLM")
-
-    # Используем настройки из сайдбара, если они установлены
-    llm_provider = None
-    model_name = None
-    llm_strategy = None
-
-    if (
-        "llm_settings" in st.session_state
-        and st.session_state.llm_settings.get("provider")
-        and st.session_state.llm_settings.get("model")
-    ):
-        llm_provider = st.session_state.llm_settings.get("provider")
-        model_name = st.session_state.llm_settings.get("model")
-        llm_strategy = st.session_state.llm_settings.get("strategy")
-
-        # Отображаем информацию о выбранных настройках
-        st.info(
-            f"Используем настройки из боковой панели:\n"
-            f"- Провайдер: {llm_provider}\n"
-            f"- Модель: {model_name}\n"
-            f"- Температура: {st.session_state.llm_settings.get('temperature', 0.0)}\n"
-            f"- Макс. токенов: {st.session_state.llm_settings.get('max_tokens', 1024)}"
-        )
-    else:
-        # Если настройки не установлены, используем ui_components
-        # Если конфигурация не инициализирована в session_state, инициализируем
-        if "config" not in st.session_state:
-            init_streamlit_config()
-
-        config = st.session_state.config
-
-        # Определяем доступных провайдеров из конфигурации
-        available_providers = config.available_providers
-
-        if not available_providers:
-            st.warning("Не найдено доступных провайдеров LLM. Проверьте файл .env")
-            return
-
-        # Используем компонент из ui_components для выбора модели
-        llm_provider, model_name, llm_strategy = display_llm_selector(
-            available_providers, key_prefix="analysis_"
-        )
-
-    if llm_strategy:
-        # Кнопка для запуска анализа с помощью LLM
-        if st.button("Провести анализ с помощью LLM"):
-            with st.spinner("Анализ разговора с помощью LLM..."):
-
-                def _analyze_with_llm():
-                    # Получаем настройки LLM из session_state или используем значения по умолчанию
-                    temperature = st.session_state.llm_settings.get("temperature", 0.0)
-                    max_tokens = st.session_state.llm_settings.get("max_tokens", 1024)
-
-                    log_info(
-                        f"Начинаем анализ транскрипции с помощью "
-                        f"{llm_provider}, модель {model_name}, "
-                        f"параметры: temp={temperature}, max_tokens={max_tokens}"
-                    )
-
-                    # Запускаем анализ с помощью LLM с параметрами из настроек
-                    analysis_results = identify_speakers_with_llm(
-                        transcript_text=transcript_text,
-                        speaker_stats=speaker_stats,
-                        llm_strategy=llm_strategy,
-                        model_name=model_name,
-                        temperature=temperature,
-                        max_tokens=max_tokens,
-                    )
-                    log_info("Анализ завершен успешно")
-
-                    # Сохраняем результаты анализа в сессии
-                    st.session_state.analysis_results = analysis_results
-
-                    # Данные о стоимости для текущего запроса
-                    current_input_tokens = llm_strategy.get_input_tokens()
-                    current_output_tokens = llm_strategy.get_output_tokens()
-                    current_price = llm_strategy.get_full_price()
-
-                    # Обновляем общую статистику за сессию
-                    if "total_llm_cost" not in st.session_state:
-                        st.session_state.total_llm_cost = 0.0
-                        st.session_state.total_input_tokens = 0
-                        st.session_state.total_output_tokens = 0
-                        st.session_state.total_calls = 0
-
-                    st.session_state.total_llm_cost += current_price
-                    st.session_state.total_input_tokens += current_input_tokens
-                    st.session_state.total_output_tokens += current_output_tokens
-                    st.session_state.total_calls += 1
-
-                    # Сохраняем статистику использования модели
-                    st.session_state.llm_stats = {
-                        "input_tokens": current_input_tokens,
-                        "output_tokens": current_output_tokens,
-                        "cache_create_tokens": llm_strategy.get_cache_create_tokens(),
-                        "cache_read_tokens": llm_strategy.get_cache_read_tokens(),
-                        "full_price": current_price,
-                        "model": model_name,
-                        "provider": llm_provider,
-                    }
-
-                    # Возвращаем результаты анализа
-                    return analysis_results
-
+        # Кнопка для обработки файла
+        if st.button("Загрузить и обработать", key="upload_button"):
+            with st.spinner("Обработка файла..."):
                 # Используем safe_operation для обработки ошибок
-                analysis_results = safe_operation(
-                    _analyze_with_llm,
-                    ErrorType.LLM_ERROR,
-                    operation_name="Анализ с помощью LLM",
-                    show_ui_error=True,
+                file_result = safe_operation(
+                    save_uploaded_file,
+                    ErrorType.FILE_ERROR,
+                    uploaded_file=uploaded_file,
                 )
 
-                # Если анализ успешно выполнен, отображаем результаты
-                if analysis_results:
-                    # Используем компонент из ui_components для отображения результатов
-                    display_analysis_results(analysis_results)
-    else:
-        st.info(
-            "Для анализа транскрипции укажите настройки LLM в боковой панели или выберите модель выше"
-        )
+                if file_result:
+                    file_path, file_size = file_result
+
+                    # Обновляем состояние приложения
+                    update_state("file_path", file_path)
+                    update_state("file_size", file_size)
+                    update_state("file_status", "uploaded")
+
+                    # Автоматически запускаем распознавание речи
+                    log_info("Автоматический запуск распознавания речи")
+                    transcription_result = safe_operation(
+                        transcribe_audio,
+                        ErrorType.TRANSCRIPTION_ERROR,
+                        file_path=file_path,
+                    )
+
+                    if transcription_result:
+                        update_state("file_status", "transcribed")
+
+                        # Загружаем текст транскрипции в состояние
+                        transcript_path = get_transcript_file_path(file_path)
+                        if os.path.exists(transcript_path):
+                            transcript_text = read_transcript(transcript_path)
+                            update_state("transcript_text", transcript_text)
+
+                    # Обновляем страницу для отображения изменений
+                    st.rerun()
 
 
-def file_upload_section():
-    """Секция загрузки файла"""
-    # Инициализируем состояние приложения
-    initialize_app_state()
+def render_file_info_content():
+    """Отрисовка информации о файле"""
+    file_path = get_state("file_path")
+    file_size = get_state("file_size")
 
-    st.title("Загрузка и распознавание аудиофайла")
-
-    # Показываем различные элементы в зависимости от состояния
-    if st.session_state.file_status == "not_uploaded":
-        # Этап 1: Загрузка файла
-        st.write("Загрузите MP3 файл для обработки и распознавания речи")
-
-        # Создаем загрузчик файлов
-        uploaded_file = st.file_uploader("Выберите MP3 файл", type=["mp3"])
-
-        if uploaded_file is not None:
-            # Отображаем информацию о загружаемом файле
-            st.write(f"Файл: {uploaded_file.name}")
-
-            # Кнопка для обработки файла
-            if st.button("Загрузить и обработать", key="upload_button"):
-                handle_file_upload(uploaded_file)
-
-    elif st.session_state.file_status == "uploaded":
-        # Этап 2: Файл загружен, предлагаем распознать речь
-        st.write("Файл успешно загружен и готов к обработке")
-
-        # Отображаем информацию о файле используя компонент из ui_components
-        file_name = os.path.basename(st.session_state.file_path)
-        formatted_size = format_size(st.session_state.file_size)
-        display_file_info(file_name, formatted_size)
-
-        # Кнопка для распознавания речи
-        if st.button("Распознать речь", key="transcribe_button"):
-            handle_transcription()
-
-        # Кнопка для очистки и возврата к загрузке
-        if st.button("Удалить файл", key="delete_button"):
-            handle_delete_files()
-
-    elif st.session_state.file_status == "transcribed":
-        # Этап 3: Речь распознана, отображаем результаты
-        st.write("Речь успешно распознана")
+    if file_path and file_size:
+        st.subheader("Информация о файле")
 
         # Отображаем информацию о файле используя компонент из ui_components
-        file_name = os.path.basename(st.session_state.file_path)
-        formatted_size = format_size(st.session_state.file_size)
+        file_name = os.path.basename(file_path)
+        formatted_size = format_size(file_size)
         display_file_info(file_name, formatted_size)
 
-        # Получаем путь к файлу транскрипции
-        transcript_path = get_transcript_file_path(st.session_state.file_path)
 
-        if os.path.exists(transcript_path):
-            # Читаем содержимое файла транскрипции
-            transcript_text = read_transcript(transcript_path)
+def render_transcription_controls():
+    """Отрисовка элементов управления для транскрипции"""
+    # Кнопка для распознавания речи
+    if st.button("Распознать речь", key="transcribe_button"):
+        file_path = get_state("file_path")
 
+        if file_path:
+            with st.spinner("Распознавание речи..."):
+                # Используем safe_operation для обработки ошибок
+                transcription_result = safe_operation(
+                    transcribe_audio,
+                    ErrorType.TRANSCRIPTION_ERROR,
+                    file_path=file_path,
+                )
+
+                if transcription_result:
+                    # Обновляем состояние приложения
+                    update_state("file_status", "transcribed")
+
+                    # Загружаем текст транскрипции в состояние
+                    transcript_path = get_transcript_file_path(file_path)
+                    if os.path.exists(transcript_path):
+                        transcript_text = read_transcript(transcript_path)
+                        update_state("transcript_text", transcript_text)
+
+                    st.rerun()
+        else:
+            st.error("Файл не найден. Загрузите файл перед распознаванием.")
+
+
+def render_transcript_content():
+    """Отрисовка содержимого транскрипции"""
+    if st.toggle("Результаты распознавания", value=True, key="transcribed_toggle"):
+        transcript_text = get_state("transcript_text")
+
+        if transcript_text:
             st.subheader("Результаты распознавания речи")
 
             # Отображаем текст
@@ -373,40 +196,257 @@ def file_upload_section():
                 height=250,
                 key="transcript_text_area",
             )
-
             copy_button(transcript_text)
 
-            # Добавляем кнопку для скачивания файла
-            with open(transcript_path, "rb") as file:
-                st.download_button(
-                    label="Скачать файл транскрипции",
-                    data=file,
-                    file_name=os.path.basename(transcript_path),
-                    mime="text/plain",
-                    key="download_transcript_button",
+
+def render_speaker_define_controls():
+    """Отрисовка компонента анализа спикеров"""
+    st.subheader("Анализ спикеров")
+
+    # Получаем текст
+    transcript_text = get_state("transcript_text")
+    if not transcript_text:
+        st.warning("Текст спикеров не найден")
+        return
+
+    # Получаем статистику спикеров или вычисляем её
+    speaker_stats = get_state("speaker_stats")
+    if not speaker_stats:
+        with st.spinner("Подсчет статистики спикеров..."):
+            speaker_stats = calculate_speaker_statistics(transcript_text)
+            update_state("speaker_stats", speaker_stats)
+
+    # Анилизируем спикеров с помощью LLM
+    # Используем настройки из сайдбара, если они установлены
+    llm_settings = get_state("llm_settings", {})
+    model_name = llm_settings.get("model")
+    llm_strategy = llm_settings.get("strategy")
+
+    if llm_strategy:
+        # Кнопка для запуска анализа с помощью LLM
+        if st.button("Провести анализ с помощью LLM"):
+            with st.spinner("Анализ разговора с помощью LLM..."):
+                # Используем safe_operation для обработки ошибок
+                analysis_results = safe_operation(
+                    _define_speakers_with_llm,
+                    ErrorType.LLM_ERROR,
+                    operation_name="Анализ с помощью LLM",
+                    show_ui_error=True,
+                    transcript_text=transcript_text,
+                    speaker_stats=speaker_stats,
+                    llm_strategy=llm_strategy,
+                    model_name=model_name,
                 )
 
-            # Добавляем разделитель
-            st.markdown("---")
+                # Сохраняем результаты анализа
+                if analysis_results:
+                    update_state("analysis_results", analysis_results)
 
-            # Запускаем анализ транскрипции
-            analyze_transcript(transcript_text)
+        # Отображаем результаты анализа, если они есть
+        analysis_results = get_state("analysis_results")
+        if analysis_results:
+            st.subheader("Результаты анализа транскрипции")
 
-            # Добавляем разделитель перед кнопкой удаления
-            st.markdown("---")
+            # Добавляем общее описание
+            if "summary" in analysis_results:
+                st.markdown(f"#### Тема разговора\n{analysis_results['summary']}\n")
 
-            # Размещаем кнопку удаления в самом низу
-            if st.button(
-                "Удалить все файлы", key="delete_files_button", type="primary"
-            ):
-                handle_delete_files()
+            # Добавляем редактор имен спикеров
+            updated_transcript = display_speaker_editor(
+                analysis_results, transcript_text
+            )
 
-        else:
-            st.warning("Файл с результатами распознавания не найден.")
+            # Если транскрипция была обновлена, сохраняем её
+            if updated_transcript:
+                log_info("Транскрипция обновлена с именами спикеров")
 
-            # Кнопка для очистки и возврата к загрузке
-            if st.button("Начать заново", key="restart_button"):
-                st.session_state.file_status = "not_uploaded"
-                st.session_state.file_path = None
-                st.session_state.file_size = None
+                # Определяем путь для сохранения обновленной транскрипции
+                file_path = get_state("file_path")
+                updated_transcript_path = get_transcript_file_path(file_path).replace(
+                    ".txt", "_named.txt"
+                )
+
+                # Сохраняем обновленную транскрипцию
+                with open(updated_transcript_path, "w", encoding="utf-8") as file:
+                    file.write(updated_transcript)
+
+                st.success(
+                    f"Обновленная транскрипция сохранена как: {os.path.basename(updated_transcript_path)}"
+                )
+
+                update_state("speaker_updated_transcript", updated_transcript)
+                update_state("file_status", "speakers_processed")
+    else:
+        st.info(
+            "Для анализа транскрипции укажите настройки LLM в боковой панели или выберите модель выше"
+        )
+
+
+def render_speaker_define_content():
+    "Показываем результаты с исправлениями имен спикеров"
+    if st.toggle(
+        "Транскрипция с именами спикеров", value=True, key="speaker_define_toggle"
+    ):
+        speaker_updated_text = get_state("speaker_updated_transcript")
+
+        if speaker_updated_text:
+            st.subheader("Обновленная транскрипция")
+
+            # Отображаем текст
+            st.text_area(
+                "Транскрипция с именами спикеров",
+                speaker_updated_text,
+                height=250,
+                key="speaker_define_text_area",
+            )
+
+            copy_button(speaker_updated_text)
+
+
+def _define_speakers_with_llm(transcript_text, speaker_stats, llm_strategy, model_name):
+    """Анализ транскрипции с помощью LLM"""
+    # Получаем настройки LLM из session_state или используем значения по умолчанию
+    llm_settings = get_state("llm_settings", {})
+    llm_provider = llm_settings.get("provider")
+    temperature = llm_settings.get("temperature", 0.0)
+    max_tokens = llm_settings.get("max_tokens", 1024)
+
+    # Запускаем анализ с помощью LLM с параметрами из настроек
+    analysis_results = identify_speakers_with_llm(
+        transcript_text=transcript_text,
+        speaker_stats=speaker_stats,
+        llm_strategy=llm_strategy,
+        model_name=model_name,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+
+    # Данные о стоимости для текущего запроса
+    current_input_tokens = llm_strategy.get_input_tokens()
+    current_output_tokens = llm_strategy.get_output_tokens()
+    current_price = llm_strategy.get_full_price()
+
+    # Обновляем общую статистику за сессию
+    if "total_llm_cost" not in st.session_state:
+        st.session_state.total_llm_cost = 0.0
+        st.session_state.total_input_tokens = 0
+        st.session_state.total_output_tokens = 0
+        st.session_state.total_calls = 0
+
+    st.session_state.total_llm_cost += current_price
+    st.session_state.total_input_tokens += current_input_tokens
+    st.session_state.total_output_tokens += current_output_tokens
+    st.session_state.total_calls += 1
+
+    # Обновляем статистику LLM
+    llm_stats = {
+        "input_tokens": current_input_tokens,
+        "output_tokens": current_output_tokens,
+        "cache_create_tokens": llm_strategy.get_cache_create_tokens(),
+        "cache_read_tokens": llm_strategy.get_cache_read_tokens(),
+        "full_price": current_price,
+        "model": model_name,
+        "provider": llm_provider,
+    }
+    update_state("llm_stats", llm_stats)
+
+    return analysis_results
+
+
+def render_delete_controls():
+    """Отрисовка элементов управления для удаления файлов"""
+    file_status = get_state("file_status")
+
+    if file_status in ["uploaded", "transcribed"]:
+        # Определяем текст кнопки в зависимости от состояния
+        button_text = (
+            "Удалить файл" if file_status == "uploaded" else "Удалить все файлы"
+        )
+        button_type = "secondary" if file_status == "uploaded" else "primary"
+
+        # Кнопка для удаления файлов
+        if st.button(button_text, key="delete_button", type=button_type):
+            handle_delete_files()
+
+
+def handle_delete_files():
+    """Обработка удаления файлов"""
+    file_path = get_state("file_path")
+
+    if file_path:
+        with st.spinner("Удаление файлов..."):
+            # Используем safe_operation для обработки ошибок
+            result = safe_operation(
+                _delete_files_impl,
+                ErrorType.FILE_ERROR,
+                operation_name="Удаление файлов",
+                file_path=file_path,
+            )
+
+            if result:
+                # Очищаем состояние и обновляем страницу
+                clear_state()
                 st.rerun()
+
+
+def _delete_files_impl(file_path):
+    """Реализация удаления файлов"""
+    # Получаем путь к файлу транскрипции текст и json
+    transcript_path = get_transcript_file_path(file_path)
+    json_transcript_path = get_json_transcript_file_path(file_path)
+
+    # Удаляем аудиофайл
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+    # Удаляем файл транскрипции
+    if os.path.exists(transcript_path):
+        os.remove(transcript_path)
+
+    # Удаляем файл json транскрипции
+    if os.path.exists(json_transcript_path):
+        os.remove(json_transcript_path)
+
+    # Также удаляем файл с обновленной транскрипцией, если он существует
+    named_transcript_path = transcript_path.replace(".txt", "_named.txt")
+    if os.path.exists(named_transcript_path):
+        os.remove(named_transcript_path)
+
+    log_info(f"Файлы удалены: {file_path}, {transcript_path}, {json_transcript_path}")
+    return True
+
+
+def render_main_page():
+    """Главный координатор отображения приложения"""
+    # Инициализируем состояние приложения
+    initialize_app_state()
+
+    st.title("Обработка и анализ аудиофайлов")
+
+    # Получаем текущее состояние
+    file_status = get_state("file_status")
+
+    # Шаг 1: Загрузка аудио
+    if file_status == "not_uploaded":
+        render_upload_controls()
+    else:
+        render_file_info_content()
+
+    # Шаг 2: Транскрипция
+    if file_status == "uploaded":
+        render_transcription_controls()
+    else:
+        render_transcript_content()
+
+    # Шаг 3: Назначим спикеров
+    if file_status == "transcribed":
+        render_speaker_define_controls()
+    else:
+        render_speaker_define_content()
+
+    if file_status == "speakers_processed":
+        pass
+
+    if file_status in ["uploaded", "transcribed", "speakers_processed"]:
+        st.markdown("---")
+        render_delete_controls()
