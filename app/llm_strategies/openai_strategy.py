@@ -55,16 +55,22 @@ class OpenAIChatStrategy(ChatModelStrategy):
         self.api_key = api_key
         self.models = [
             Model(
+                name="gpt-4.1",
+                output_max_tokens=32_768,
+                price_input=2.0,
+                price_output=8.0,
+            ),
+            Model(
                 name="gpt-4o",
                 output_max_tokens=16_384,
                 price_input=2.5,
                 price_output=10.0,
             ),
             Model(
-                name="gpt-4.5-preview",
-                output_max_tokens=16_384,
-                price_input=75.0,
-                price_output=150.0,
+                name="gpt-4.1-mini",
+                output_max_tokens=32_768,
+                price_input=0.40,
+                price_output=1.60,
             ),
             Model(
                 name="gpt-4o-mini",
@@ -73,10 +79,10 @@ class OpenAIChatStrategy(ChatModelStrategy):
                 price_output=0.6,
             ),
             Model(
-                name="o1-mini",
-                output_max_tokens=65_536,
-                price_input=1.10,
-                price_output=4.40,
+                name="gpt-4.1-nano",
+                output_max_tokens=32_768,
+                price_input=0.10,
+                price_output=0.40,
             ),
             Model(
                 name="o3-mini",
