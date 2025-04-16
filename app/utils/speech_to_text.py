@@ -4,7 +4,7 @@ import json
 import streamlit as st
 from utils.logger import log_info
 from utils.error_handler import safe_operation, ErrorType
-from utils.config import init_streamlit_config
+from utils.config import get_config
 
 # URL для API распознавания речи
 STT_API_URL = "https://api.elevenlabs.io/v1/speech-to-text"
@@ -125,10 +125,7 @@ def _transcribe_audio_impl(file_path):
         dict: Словарь с результатами распознавания
     """
     # Получаем конфигурацию
-    if "config" not in st.session_state:
-        init_streamlit_config()
-
-    config = st.session_state.config
+    config = get_config()
 
     if not config.elevenlabs_api_key:
         raise ValueError("API ключ ElevenLabs не найден в конфигурации")

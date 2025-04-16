@@ -63,11 +63,6 @@ def display_llm_settings():
             }
 
         # Если конфигурация не инициализирована в session_state, инициализируем
-        if "config" not in st.session_state:
-            from utils.config import init_streamlit_config
-
-            init_streamlit_config()
-
         config = st.session_state.config
 
         # Определяем доступных провайдеров из конфигурации

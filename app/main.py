@@ -1,5 +1,5 @@
 import streamlit as st
-from ui.components import render_main_page
+from ui.main_renderer import render_main_page
 from ui.sidebar import setup_sidebar
 from utils.logger import log_info
 from utils.error_handler import safe_operation, ErrorType

@@ -3,6 +3,7 @@ from typing import Optional, List
 import os
 from dotenv import load_dotenv
 from utils.error_handler import ErrorType, handle_error
+import streamlit as st
 
 # Глобальный экземпляр конфигурации (для паттерна Синглтон)
 _config_instance = None
@@ -20,6 +21,7 @@ class AppConfig:
 
     # Пути к директориям
     data_dir: str = "./data"
+    context_dir: str = "./context"
 
     # Настройки по умолчанию для LLM
     default_llm_provider: str = "Anthropic"
@@ -104,8 +106,6 @@ def init_streamlit_config():
     Инициализирует конфигурацию в Streamlit session_state.
     Вызывается из основного файла приложения.
     """
-    import streamlit as st
-
     st.session_state.config = get_config()
 
     # Инициализируем настройки LLM, если они еще не установлены

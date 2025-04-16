@@ -172,4 +172,9 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
-data/
+
+!context/terms.sample.md
+context/terms.md
+data/*.mp3
+data/*.txt
+data/*.json
