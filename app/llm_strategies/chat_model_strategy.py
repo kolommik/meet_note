@@ -1,17 +1,19 @@
 """
-This module implements the Strategy pattern for interacting with different chat model APIs.
+Модуль реализует паттерн Стратегия для взаимодействия с разными API чат-моделей.
 
-Defines the ChatModelStrategy abstract base class, which serves as the common interface for all chat model strategies.
-This class enforces the implementation of essential methods for interacting with chat model APIs.
+Определяет абстрактный базовый класс ChatModelStrategy, который служит
+общим интерфейсом для всех стратегий чат-моделей. Этот класс требует
+реализации основных методов для взаимодействия с API чат-моделей.
 
-Guidelines for refactoring and extending this module:
-1. Adhere to the Strategy pattern
-2. Avoid coupling the strategies with the client code
-3. Keep the strategies focused and cohesive
-4. Consider extracting common functionality
-5. Maintain the interface of `ChatModelStrategy`
+Рекомендации по рефакторингу и расширению этого модуля:
+1. Следуйте паттерну Стратегия
+2. Избегайте связывания стратегий с клиентским кодом
+3. Поддерживайте стратегии сфокусированными и связными
+4. Рассмотрите возможность извлечения общей функциональности в базовый класс
+5. Сохраняйте интерфейс `ChatModelStrategy`
 
-Following these guidelines will keep the module flexible, extensible, and aligned with the Strategy pattern.
+Следование этим рекомендациям сохранит модуль гибким, расширяемым и соответствующим
+паттерну Стратегия.
 """
 
 from typing import List, Dict
@@ -20,113 +22,117 @@ from abc import ABC, abstractmethod
 
 class ChatModelStrategy(ABC):
     """
-    Abstract base class for chat model strategies.
+    Абстрактный базовый класс для стратегий чат-моделей.
 
-    This class defines the common interface for all chat model strategies and enforces the implementation
-    of essential methods for interacting with chat model APIs.
+    Этот класс определяет общий интерфейс для всех стратегий чат-моделей
+    и требует реализации основных методов для взаимодействия с API чат-моделей.
 
     Methods
     -------
     get_models()
-        Returns a list of available models for a strategy.
+        Возвращает список доступных моделей для стратегии.
     get_output_max_tokens(model_name)
-        Returns the maximum number of output tokens for the specified model.
+        Возвращает максимальное количество выходных токенов для указанной модели.
     get_input_tokens()
-        Returns the number of input tokens used in the last API request.
+        Возвращает количество входных токенов, использованных в последнем API-запросе.
     get_output_tokens()
-        Returns the number of output tokens generated in the last API response.
+        Возвращает количество выходных токенов, сгенерированных в последнем API-ответе.
+    get_cache_create_tokens()
+        Возвращает количество токенов, используемых для создания кэша.
+    get_cache_read_tokens()
+        Возвращает количество токенов, прочитанных из кэша.
     get_full_price()
-        Calculates and returns the total price based on the input and output tokens.
+        Рассчитывает и возвращает полную стоимость на основе входных и выходных токенов.
     send_message(system_prompt, messages, model_name, max_tokens, temperature)
-        Sends a message to the chat model API and returns the generated response.
+        Отправляет сообщение к API чат-модели и возвращает сгенерированный ответ.
     """
 
     @abstractmethod
     def get_models(self) -> List[str]:
         """
-        Returns a list of available models for a strategy.
+        Возвращает список доступных моделей для стратегии.
 
         Returns
         -------
         List[str]
-            A list of available model names.
+            Список названий доступных моделей.
         """
         pass
 
     @abstractmethod
     def get_output_max_tokens(self, model_name: str) -> int:
         """
-        Returns the maximum number of output tokens for the specified model.
+        Возвращает максимальное количество выходных токенов для указанной модели.
 
         Parameters
         ----------
         model_name : str
-            The name of the model.
+            Название модели.
 
         Returns
         -------
         int
-            The maximum number of output tokens for the specified model.
+            Максимальное количество выходных токенов для указанной модели.
         """
         pass
 
     @abstractmethod
     def get_input_tokens(self) -> int:
         """
-        Returns the number of input tokens used in the last API request.
+        Возвращает количество входных токенов, использованных в последнем API-запросе.
 
         Returns
         -------
         int
-            The number of input tokens used in the last API request.
+            Количество входных токенов, использованных в последнем API-запросе.
         """
         pass
 
     @abstractmethod
     def get_output_tokens(self) -> int:
         """
-        Returns the number of output tokens generated in the last API response.
+        Возвращает количество выходных токенов, сгенерированных в последнем API-ответе.
 
         Returns
         -------
         int
-            The number of output tokens generated in the last API response.
+            Количество выходных токенов, сгенерированных в последнем API-ответе.
         """
         pass
 
     @abstractmethod
     def get_cache_create_tokens(self) -> int:
         """
-        Returns the number of cashed input tokens used in the last API request.
+        Возвращает количество токенов, используемых для создания кэша в последнем API-запросе.
 
         Returns
         -------
         int
-            The number of cashed input tokens generated in the last API response.
+            Количество токенов создания кэша в последнем API-ответе.
         """
         pass
 
     @abstractmethod
     def get_cache_read_tokens(self) -> int:
         """
-        Returns the number of used cashed tokens used in the last API request.
+        Возвращает количество токенов, прочитанных из кэша в последнем API-запросе.
 
         Returns
         -------
         int
-            The number of used cashed tokens generated in the last API response.
+            Количество токенов чтения из кэша в последнем API-ответе.
         """
         pass
 
     @abstractmethod
     def get_full_price(self) -> float:
         """
-        Calculates and returns the total price based on the input and output tokens.
+        Рассчитывает и возвращает полную стоимость на основе входных и выходных токенов.
 
         Returns
         -------
         float
-            The total price based on the input and output tokens.
+            Полная стоимость запроса в долларах США.
         """
         pass
 
@@ -140,24 +146,24 @@ class ChatModelStrategy(ABC):
         temperature: float,
     ) -> str:
         """
-        Sends a message to the chat model API and returns the generated response.
+        Отправляет сообщение к API чат-модели и возвращает сгенерированный ответ.
 
         Parameters
         ----------
         system_prompt : str
-            The system prompt to provide context for the conversation.
+            Системный промпт для контекста разговора.
         messages : List[Dict[str, str]]
-            A list of messages in the conversation, each represented as a dictionary.
+            Список сообщений в разговоре, каждое представлено в виде словаря.
         model_name : str
-            The name of the model to use for generating the response.
+            Название модели для генерации ответа.
         max_tokens : int
-            The maximum number of tokens to generate in the response.
+            Максимальное количество токенов для генерации в ответе.
         temperature : float
-            The temperature value to control the randomness of the generated response.
+            Температура генерации для контроля случайности сгенерированного ответа.
 
         Returns
         -------
         str
-            The generated response from the chat model API.
+            Сгенерированный ответ от API чат-модели.
         """
         pass

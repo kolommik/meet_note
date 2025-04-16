@@ -1,57 +1,38 @@
 """
-Implements the AnthropicChatStrategy, a concrete strategy for interacting with the Anthropic chat model API.
-This strategy adheres to the ChatModelStrategy interface and encapsulates Anthropic-specific functionality.
+Реализация стратегии для взаимодействия с API Anthropic.
+Наследуется от BaseChatModelStrategy и реализует специфические
+для Anthropic методы и логику.
 """
 
 from typing import List, Dict
 from anthropic import Anthropic
-from llm_strategies.chat_model_strategy import ChatModelStrategy
+from llm_strategies.base_chat_model_strategy import BaseChatModelStrategy
 from llm_strategies.model import Model
 
 
-# https://docs.anthropic.com/en/docs/about-claude/models/all-models
-class AnthropicChatStrategy(ChatModelStrategy):
+class AnthropicChatStrategy(BaseChatModelStrategy):
     """
-    A concrete strategy for interacting with the Anthropic chat model API.
+    Конкретная стратегия для взаимодействия с API Anthropic.
+
+    Наследует общую функциональность от BaseChatModelStrategy и добавляет
+    специфичную для Anthropic логику работы с API.
 
     Parameters
     ----------
     api_key : str
-        The API key for accessing the Anthropic API.
-
-    Attributes
-    ----------
-    api_key : str
-        The API key for accessing the Anthropic API.
-    models : List[Model]
-        A list of available Anthropic models.
-    client : Anthropic
-        The Anthropic client instance for making API requests.
-    input_tokens : int
-        The number of input tokens used in the last API request.
-    output_tokens : int
-        The number of output tokens generated in the last API response.
-    model : str
-        The name of the model used in the last API request.
-
-    Methods
-    -------
-    get_models()
-        Returns a list of available model names.
-    get_output_max_tokens(model_name)
-        Returns the maximum number of output tokens for the specified model.
-    get_input_tokens()
-        Returns the number of input tokens used in the last API request.
-    get_output_tokens()
-        Returns the number of output tokens generated in the last API response.
-    get_full_price()
-        Calculates and returns the total price based on the input and output tokens.
-    send_message(system_prompt, messages, model_name, max_tokens, temperature)
-        Sends a message to the Anthropic API and returns the generated response.
+        API ключ для доступа к API Anthropic.
     """
 
     def __init__(self, api_key: str):
-        self.api_key = api_key
+        """
+        Инициализирует стратегию Anthropic и настраивает клиент API.
+
+        Parameters
+        ----------
+        api_key : str
+            API ключ для доступа к API Anthropic.
+        """
+        super().__init__(api_key)
         self.models = [
             Model(
                 name="claude-3-7-sonnet-latest",
@@ -91,59 +72,40 @@ class AnthropicChatStrategy(ChatModelStrategy):
             ),
         ]
         self.client = Anthropic(api_key=self.api_key)
-        self.input_tokens = 0
-        self.output_tokens = 0
-        self.cache_create_tokens = 0
-        self.cache_read_tokens = 0
-        self.model = None
-
-    def get_models(self) -> List[str]:
-        return [model.name for model in self.models]
-
-    def get_output_max_tokens(self, model_name: str) -> int:
-        return self.models[self.get_models().index(model_name)].output_max_tokens
-
-    def get_input_tokens(self) -> int:
-        return self.input_tokens
-
-    def get_output_tokens(self) -> int:
-        return self.output_tokens
-
-    def get_cache_create_tokens(self) -> int:
-        return self.cache_create_tokens
-
-    def get_cache_read_tokens(self) -> int:
-        return self.cache_read_tokens
 
     def get_full_price(self) -> float:
+        """
+        Рассчитывает и возвращает полную стоимость запроса по ценам Anthropic.
+
+        Переопределяет базовый метод для учета специфики ценообразования Anthropic:
+        - Токены записи в кэш на 25% дороже базовых входных токенов
+        - Токены чтения из кэша на 90% дешевле базовых входных токенов
+
+        Returns
+        -------
+        float
+            Полная стоимость запроса в долларах США.
+        """
         # Проверяем, инициализирована ли модель
         if self.model is None:
             return 0.0  # Возвращаем 0, если модель не определена
 
-        inputs = (
-            self.input_tokens
-            * self.models[self.get_models().index(self.model)].price_input
-            / 1_000_000.0
-        )
-        outputs = (
-            self.output_tokens
-            * self.models[self.get_models().index(self.model)].price_output
-            / 1_000_000.0
-        )
+        model_index = self.get_models().index(self.model)
+        model_info = self.models[model_index]
+
+        # Базовая стоимость входных токенов
+        inputs = self.input_tokens * model_info.price_input / 1_000_000.0
+
+        # Базовая стоимость выходных токенов
+        outputs = self.output_tokens * model_info.price_output / 1_000_000.0
+
         # Токены записи в кэш на 25% дороже базовых входных токенов
         cache_create = (
-            self.cache_create_tokens
-            * self.models[self.get_models().index(self.model)].price_input
-            * 1.25
-            / 1_000_000.0
+            self.cache_create_tokens * model_info.price_input * 1.25 / 1_000_000.0
         )
+
         # Токены чтения из кэша на 90% дешевле базовых входных токенов
-        cache_read = (
-            self.cache_read_tokens
-            * self.models[self.get_models().index(self.model)].price_input
-            * 0.1
-            / 1_000_000.0
-        )
+        cache_read = self.cache_read_tokens * model_info.price_input * 0.1 / 1_000_000.0
 
         return inputs + outputs + cache_create + cache_read
 
@@ -155,7 +117,27 @@ class AnthropicChatStrategy(ChatModelStrategy):
         max_tokens: int,
         temperature: float = 0,
     ) -> str:
+        """
+        Отправляет сообщение в API Anthropic и возвращает сгенерированный ответ.
 
+        Parameters
+        ----------
+        system_prompt : str
+            Системный промпт для контекста разговора.
+        messages : List[Dict[str, str]]
+            Список сообщений в разговоре, каждое представлено в виде словаря.
+        model_name : str
+            Название модели для генерации ответа.
+        max_tokens : int
+            Максимальное количество токенов для генерации в ответе.
+        temperature : float, optional
+            Температура генерации (случайность ответа), по умолчанию 0.
+
+        Returns
+        -------
+        str
+            Сгенерированный ответ от API Anthropic.
+        """
         self.model = model_name
 
         cashed_messages = []

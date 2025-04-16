@@ -1,35 +1,37 @@
 """
-Defines the Model class, which represents a chat model with its associated properties such as name, output_max_tokens,
-price_input, and price_output.
-This class is used by the chat model strategies to store and access model-specific information.
+Определяет класс Model, который представляет чат-модель с соответствующими свойствами,
+такими как name (название), output_max_tokens (максимальное количество выходных токенов),
+price_input (цена входных токенов) и price_output (цена выходных токенов).
+Этот класс используется стратегиями чат-моделей для хранения и доступа
+к специфичной для модели информации.
 """
 
 
 class Model:
     """
-    Represents a chat model with its associated properties.
+    Представляет чат-модель с соответствующими свойствами.
 
     Parameters
     ----------
     name : str
-        The name of the model.
+        Название модели.
     output_max_tokens : int
-        The maximum number of output tokens the model can generate.
+        Максимальное количество выходных токенов, которые может сгенерировать модель.
     price_input : float
-        The price per input token for the model.
+        Цена за входной токен для модели (в долларах США за 1 миллион токенов).
     price_output : float
-        The price per output token for the model.
+        Цена за выходной токен для модели (в долларах США за 1 миллион токенов).
 
     Attributes
     ----------
     name : str
-        The name of the model.
+        Название модели.
     output_max_tokens : int
-        The maximum number of output tokens the model can generate.
+        Максимальное количество выходных токенов, которые может сгенерировать модель.
     price_input : float
-        The price per input token for the model.
+        Цена за входной токен для модели (в долларах США за 1 миллион токенов).
     price_output : float
-        The price per output token for the model.
+        Цена за выходной токен для модели (в долларах США за 1 миллион токенов).
     """
 
     def __init__(

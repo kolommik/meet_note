@@ -1,118 +1,93 @@
 """
-Implements the DeepseekChatStrategy, a concrete strategy for interacting with the Deepseek chat model API.
-This strategy adheres to the ChatModelStrategy interface and encapsulates Deepseek-specific functionality.
+Реализация стратегии для взаимодействия с API Deepseek.
+Наследуется от BaseChatModelStrategy и реализует специфические
+для Deepseek методы и логику.
 """
 
 from typing import List, Dict
 from openai import OpenAI
+from llm_strategies.base_chat_model_strategy import BaseChatModelStrategy
 from llm_strategies.model import Model
-from llm_strategies.chat_model_strategy import ChatModelStrategy
 
 
-# https://api-docs.deepseek.com/quick_start/pricing
-class DeepseekChatStrategy(ChatModelStrategy):
+class DeepseekChatStrategy(BaseChatModelStrategy):
     """
-    A concrete strategy for interacting with the Deepseek chat model API.
+    Конкретная стратегия для взаимодействия с API Deepseek.
+
+    Наследует общую функциональность от BaseChatModelStrategy и добавляет
+    специфичную для Deepseek логику работы с API.
 
     Parameters
     ----------
     api_key : str
-        The API key for accessing the Deepseek API.
-
-    Attributes
-    ----------
-    api_key : str
-        The API key for accessing the Deepseek API.
-    models : List[Model]
-        A list of available Deepseek models.
-    client : OpenAI
-        The Deepseek client instance for making API requests.
-    input_tokens : int
-        The number of input tokens used in the last API request.
-    output_tokens : int
-        The number of output tokens generated in the last API response.
-    model : str
-        The name of the model used in the last API request.
-
-    Methods
-    -------
-    get_models()
-        Returns a list of available model names.
-    get_output_max_tokens(model_name)
-        Returns the maximum number of output tokens for the specified model.
-    get_input_tokens()
-        Returns the number of input tokens used in the last API request.
-    get_output_tokens()
-        Returns the number of output tokens generated in the last API response.
-    get_full_price()
-        Calculates and returns the total price based on the input and output tokens.
-    send_message(system_prompt, messages, model_name, max_tokens, temperature)
-        Sends a message to the Deepseek API and returns the generated response.
+        API ключ для доступа к API Deepseek.
     """
 
     def __init__(self, api_key: str):
-        self.api_key = api_key
+        """
+        Инициализирует стратегию Deepseek и настраивает клиент API.
+
+        Parameters
+        ----------
+        api_key : str
+            API ключ для доступа к API Deepseek.
+        """
+        super().__init__(api_key)
         self.models = [
+            # DeepSeek-V3 (обычная чат-модель)
             Model(
                 name="deepseek-chat",
                 output_max_tokens=4096,
                 price_input=0.14,
                 price_output=0.28,
             ),
+            # DeepSeek-R1 (модель для рассуждений)
+            Model(
+                name="deepseek-reasoner",
+                output_max_tokens=4096,
+                price_input=0.55,  # Стоимость для cache miss
+                price_output=2.19,
+            ),
         ]
         self.client = OpenAI(api_key=self.api_key, base_url="https://api.deepseek.com")
-        self.input_tokens = 0
-        self.output_tokens = 0
-        self.cache_create_tokens = 0
-        self.cache_read_tokens = 0
-        self.model = None
-
-    def get_models(self) -> List[str]:
-        return [model.name for model in self.models]
-
-    def get_output_max_tokens(self, model_name: str) -> int:
-        return self.models[self.get_models().index(model_name)].output_max_tokens
-
-    def get_input_tokens(self) -> int:
-        return self.input_tokens
-
-    def get_output_tokens(self) -> int:
-        return self.output_tokens
-
-    def get_cache_create_tokens(self) -> int:
-        return self.cache_create_tokens
-
-    def get_cache_read_tokens(self) -> int:
-        return self.cache_read_tokens
 
     def get_full_price(self) -> float:
+        """
+        Рассчитывает и возвращает полную стоимость запроса по ценам Deepseek.
+
+        Переопределяет базовый метод для учета специфики ценообразования Deepseek:
+        - Разные модели имеют разную стоимость
+        - Особая обработка cached токенов
+        - Для модели deepseek-reasoner учитывается выходной текст рассуждений и ответа
+
+        Returns
+        -------
+        float
+            Полная стоимость запроса в долларах США.
+        """
         # Проверяем, инициализирована ли модель
         if self.model is None:
             return 0.0  # Возвращаем 0, если модель не определена
 
-        inputs = (
-            self.input_tokens
-            * self.models[self.get_models().index(self.model)].price_input
-            / 1_000_000.0
+        model_index = self.get_models().index(self.model)
+        model_info = self.models[model_index]
+
+        # Базовая стоимость входных токенов (не из кэша)
+        inputs = self.input_tokens * model_info.price_input / 1_000_000.0
+
+        # Базовая стоимость выходных токенов
+        outputs = self.output_tokens * model_info.price_output / 1_000_000.0
+
+        # Токены записи в кэш стоят столько же как входные токены (cache miss)
+        cache_create = self.cache_create_tokens * model_info.price_input / 1_000_000.0
+
+        # Токены чтения из кэша (cache hit)
+        # Для deepseek-reasoner цена cache hit = $0.14 / млн токенов
+        # Для deepseek-chat используем базовую логику со скидкой 90%
+        cache_read_price = (
+            0.14 if self.model == "deepseek-reasoner" else model_info.price_input * 0.1
         )
-        outputs = (
-            self.output_tokens
-            * self.models[self.get_models().index(self.model)].price_output
-            / 1_000_000.0
-        )
-        # Токены записи в кэш стоят столько же как входные токены
-        cache_create = (
-            self.cache_create_tokens
-            * self.models[self.get_models().index(self.model)].price_input
-            / 1_000_000.0
-        )
-        # Токены чтения из кэша на 90% дешевле базовых входных токенов
-        cache_read = (
-            self.cache_read_tokens
-            * self.models[self.get_models().index(self.model)].price_input
-            * 0.1
-            / 1_000_000.0
-        )
+        cache_read = self.cache_read_tokens * cache_read_price / 1_000_000.0
 
         return inputs + outputs + cache_create + cache_read
 
@@ -124,6 +99,27 @@ class DeepseekChatStrategy(ChatModelStrategy):
         max_tokens: int,
         temperature: float = 0,
     ) -> str:
+        """
+        Отправляет сообщение в API Deepseek и возвращает сгенерированный ответ.
+
+        Parameters
+        ----------
+        system_prompt : str
+            Системный промпт для контекста разговора.
+        messages : List[Dict[str, str]]
+            Список сообщений в разговоре, каждое представлено в виде словаря.
+        model_name : str
+            Название модели для генерации ответа (deepseek-chat или deepseek-reasoner).
+        max_tokens : int
+            Максимальное количество токенов для генерации в ответе.
+        temperature : float, optional
+            Температура генерации (случайность ответа), по умолчанию 0.
+
+        Returns
+        -------
+        str
+            Сгенерированный ответ от API Deepseek.
+        """
         self.model = model_name
 
         full_messages = [{"role": "system", "content": f"{system_prompt}"}]
