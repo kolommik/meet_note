@@ -57,7 +57,7 @@ def display_llm_settings():
         if "llm_settings" not in st.session_state:
             st.session_state.llm_settings = {
                 "temperature": 0.0,
-                "max_tokens": 1024,
+                "max_tokens": 4096,
                 "provider": None,
                 "model": None,
             }
@@ -140,10 +140,10 @@ def display_llm_settings():
         # Поле для ввода максимального количества токенов
         st.session_state.llm_settings["max_tokens"] = st.sidebar.number_input(
             "Макс. токенов",
-            min_value=100,
+            min_value=1024,
             max_value=8192,
-            value=st.session_state.llm_settings.get("max_tokens", 1024),
-            step=100,
+            value=st.session_state.llm_settings.get("max_tokens", 4096),
+            step=512,
             help="Максимальное количество токенов в ответе LLM",
         )
 
@@ -158,20 +158,29 @@ def display_llm_settings():
 
 
 def display_llm_stats():
+    st.sidebar.markdown("---")
     """Отображение статистики использования LLM"""
+
+    # Инициализируем отслеживание общей стоимости за сессию, если его еще нет
+    if "total_llm_cost" not in st.session_state:
+        st.session_state.total_llm_cost = 0.0
+        st.session_state.total_input_tokens = 0
+        st.session_state.total_output_tokens = 0
+        st.session_state.total_calls = 0
+
+    if "llm_stats" in st.session_state and st.sidebar.toggle(
+        "Метрики", key="full_price_toggle"
+    ):
+        st.sidebar.metric(
+            "Полная стоимость", f"{100*st.session_state.total_llm_cost:.4f}¢"
+        )
+
     if "llm_stats" in st.session_state and st.sidebar.toggle(
         "Статистика LLM", value=False, key="llm_stats_toggle"
     ):
         stats = st.session_state.llm_stats
 
         st.sidebar.subheader("Статистика использования LLM")
-
-        # Инициализируем отслеживание общей стоимости за сессию, если его еще нет
-        if "total_llm_cost" not in st.session_state:
-            st.session_state.total_llm_cost = 0.0
-            st.session_state.total_input_tokens = 0
-            st.session_state.total_output_tokens = 0
-            st.session_state.total_calls = 0
 
         if stats["provider"] and stats["model"]:
             st.sidebar.markdown("**Последний запрос:**")
@@ -214,6 +223,7 @@ def display_llm_stats():
 
 def display_debug_panel():
     """Отображение отладочной панели"""
+    st.sidebar.markdown("---")
     st.sidebar.title("Отладочная панель")
 
     if st.sidebar.toggle("Показать инструменты", value=False, key="debug_ctrl_toggle"):

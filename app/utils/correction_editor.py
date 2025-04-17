@@ -154,22 +154,24 @@ def _display_correction_editor_impl(
             # Колонка с оригинальным текстом
             with col2:
                 st.text_area(
-                    "",
+                    "Оригинальный текст",
                     value=original_text,
                     key=f"original_{idx}",
                     disabled=True,
                     height=80,
+                    label_visibility="collapsed",
                 )
 
             # Колонка с исправленным текстом (редактируемым)
             with col3:
                 edited_text = st.text_area(
-                    "",
+                    "Исправленный текст",
                     value=st.session_state.edited_corrections.get(
                         original_text, corrected_text
                     ),
                     key=f"corrected_{idx}",
                     height=80,
+                    label_visibility="collapsed",
                 )
                 st.session_state.edited_corrections[original_text] = edited_text
 

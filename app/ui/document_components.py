@@ -3,11 +3,13 @@
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 import base64
 from pathlib import Path
 from utils.error_handler import safe_operation, ErrorType
 from utils.file_handler import save_markdown_document
 from ui.app_state import get_state, update_state
+from ui.ui_components import copy_button
 from utils.document_generation import generate_meeting_documents
 
 
@@ -179,26 +181,26 @@ def render_document_content():
 
     with doc_tab1:
         st.markdown(transcript_doc)
-        col1, col2 = st.columns([1, 4])
+        col1, col2, _ = st.columns([1, 1, 1])
         with col1:
             if transcript_doc_path:
                 create_download_button(
-                    transcript_doc,
-                    f"{file_base_name}_transcript.md",
-                    "Скачать документ",
+                    transcript_doc, f"{file_base_name}_transcript.md"
                 )
+        with col2:
+            copy_button(transcript_doc)
 
     with doc_tab2:
         st.markdown(summary_doc)
-        col1, col2 = st.columns([1, 4])
+        col1, col2, _ = st.columns([1, 1, 1])
         with col1:
             if summary_doc_path:
-                create_download_button(
-                    summary_doc, f"{file_base_name}_summary.md", "Скачать документ"
-                )
+                create_download_button(summary_doc, f"{file_base_name}_summary.md")
+        with col2:
+            copy_button(summary_doc)
 
 
-def create_download_button(content, filename, button_text="Скачать"):
+def create_download_button(content, filename, button_text="💾 Скачать документ"):
     """
     Создает кнопку для скачивания содержимого как файла.
 
@@ -210,15 +212,26 @@ def create_download_button(content, filename, button_text="Скачать"):
     # Кодируем содержимое в base64
     b64 = base64.b64encode(content.encode()).decode()
 
-    # Создаем HTML для скачивания
-    href = (
-        f'<a href="data:file/txt;base64,{b64}" download="{filename}" style="text-decoration:none;">'
-        f'<button style="padding:0.5rem; background-color:#4CAF50; color:white; '
-        f'border:none; border-radius:0.3rem; cursor:pointer; width:100%;">{button_text}</button></a>'
-    )
+    # Создаем HTML для скачивания с одинаковым стилем
+    html_code = f"""
+    <div>
+        <a href="data:file/txt;base64,{b64}" download="{filename}" style="text-decoration:none;">
+            <button style="
+                padding: 8px 16px;
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                cursor: pointer;
+                border-radius: 0.3rem;
+                width: 100%;">
+                {button_text}
+            </button>
+        </a>
+    </div>
+    """
 
     # Отображаем HTML
-    st.markdown(href, unsafe_allow_html=True)
+    components.html(html_code, height=60)
 
 
 def download_as_file(content, filename):

@@ -2,20 +2,21 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 
-def copy_button(text_to_copy: str, title: str = "Скопировать"):
+def copy_button(text_to_copy: str, title: str = "📋 Скопировать"):
     """
     Создает кнопку с помощью HTML и JavaScript.
     Копирует переданный текст в буфер обмена при нажатии.
     """
     html_code = f"""
-    <div style="margin-top:10px;">
+    <div>
         <button onclick="copyToClipboard()" style="
             padding: 8px 16px;
             background-color: #4CAF50;
             color: white;
             border: none;
             cursor: pointer;
-            border-radius: 4px;">
+            border-radius:0.3rem;
+            width:100%;">
             {title}
         </button>
     </div>
@@ -26,6 +27,10 @@ def copy_button(text_to_copy: str, title: str = "Скопировать"):
           textarea.value = `{text_to_copy}`;
           textarea.style.position = 'fixed';  // Предотвращаем прокрутку до элемента
           textarea.style.opacity = '0';  // Делаем элемент невидимым
+          // Добавляем aria-label для доступности
+          textarea.setAttribute('aria-label', 'Временное поле для копирования');
+          // Можно также добавить атрибут tabindex="-1", чтобы исключить из навигации с клавиатуры
+          textarea.setAttribute('tabindex', '-1');
           document.body.appendChild(textarea);
 
           try {{

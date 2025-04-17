@@ -92,6 +92,7 @@ def render_delete_controls():
         "transcribed",
         "speakers_processed",
         "corrections_processed",
+        "documents_created",
     ]:
         # Определяем текст кнопки в зависимости от состояния
         button_text = (
