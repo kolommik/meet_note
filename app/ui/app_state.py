@@ -4,6 +4,7 @@
 """
 
 import streamlit as st
+from utils.llm_stats import initialize_llm_stats
 
 
 def initialize_app_state():
@@ -44,19 +45,12 @@ def initialize_app_state():
     if "meeting_summary_path" not in st.session_state:
         st.session_state.meeting_summary_path = None
 
-    # LLM настройки и статистика
+    # LLM настройки
     if "llm_settings" not in st.session_state:
-        st.session_state.llm_settings = {"temperature": 0.0, "max_tokens": 1024}
-    if "llm_stats" not in st.session_state:
-        st.session_state.llm_stats = {
-            "input_tokens": 0,
-            "output_tokens": 0,
-            "cache_create_tokens": 0,
-            "cache_read_tokens": 0,
-            "full_price": 0.0,
-            "model": None,
-            "provider": None,
-        }
+        st.session_state.llm_settings = {"temperature": 0.0, "max_tokens": 2048}
+
+    # Инициализируем статистику LLM
+    initialize_llm_stats()
 
 
 def update_state(key, value):

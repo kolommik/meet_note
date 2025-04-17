@@ -84,7 +84,7 @@ def identify_speakers_with_llm(
     llm_strategy,
     model_name: str,
     temperature: float = 0.0,
-    max_tokens: int = 1024,
+    max_tokens: int = 2048,
 ) -> Dict[str, Any]:
     """
     Использует LLM для определения имен спикеров и анализа разговора.
@@ -123,7 +123,7 @@ def _identify_speakers_with_llm_impl(
     llm_strategy,
     model_name: str,
     temperature: float = 0.0,
-    max_tokens: int = 1024,
+    max_tokens: int = 2048,
 ) -> Dict[str, Any]:
     """Внутренняя реализация анализа спикеров с помощью LLM."""
     # Подготовка статистики для включения в промпт

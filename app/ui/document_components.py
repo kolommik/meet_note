@@ -8,6 +8,7 @@ import base64
 from pathlib import Path
 from utils.error_handler import safe_operation, ErrorType
 from utils.file_handler import save_markdown_document
+from utils.llm_stats import update_llm_stats
 from ui.app_state import get_state, update_state
 from ui.ui_components import copy_button
 from utils.document_generation import generate_meeting_documents
@@ -131,18 +132,8 @@ def render_document_controls():
                 update_state("file_status", "documents_created")
 
                 # Обновляем статистику LLM
-                update_state(
-                    "llm_stats",
-                    {
-                        "input_tokens": llm_strategy.get_input_tokens(),
-                        "output_tokens": llm_strategy.get_output_tokens(),
-                        "cache_create_tokens": llm_strategy.get_cache_create_tokens(),
-                        "cache_read_tokens": llm_strategy.get_cache_read_tokens(),
-                        "full_price": llm_strategy.get_full_price(),
-                        "model": model_name,
-                        "provider": llm_settings.get("provider", ""),
-                    },
-                )
+                llm_stats = update_llm_stats(llm_strategy, model_name)
+                update_state("llm_stats", llm_stats)
 
                 # Завершаем прогресс
                 if show_progress:

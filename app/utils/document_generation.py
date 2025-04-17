@@ -8,6 +8,7 @@ import re
 from typing import Dict, Any, List, Tuple
 from utils.prompts import PROMPTS
 from utils.error_handler import safe_operation, ErrorType
+from utils.llm_stats import update_llm_stats
 
 
 def _split_transcript_for_processing(
@@ -126,6 +127,9 @@ def _generate_large_document_impl(
         temperature=temperature,
     )
 
+    # Обновляем статистику LLM после начального запроса
+    update_llm_stats(llm_strategy, model_name)
+
     # Если данных для продолжения нет, возвращаем текущий документ
     if not continuation_data:
         return current_document
@@ -150,6 +154,9 @@ def _generate_large_document_impl(
                     max_tokens=max_tokens_per_request,
                     temperature=temperature,
                 )
+
+                # Обновляем статистику LLM после каждого запроса продолжения
+                update_llm_stats(llm_strategy, model_name)
 
                 # Добавляем продолжение к текущему документу
                 current_document += "\n" + continuation

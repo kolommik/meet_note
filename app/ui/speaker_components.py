@@ -13,6 +13,7 @@ from utils.speaker_analysis import (
 )
 from utils.speaker_editor import display_speaker_editor
 from utils.speech_to_text import get_transcript_file_path
+from utils.llm_stats import update_llm_stats
 from ui.app_state import get_state, update_state
 from ui.ui_components import copy_button
 
@@ -121,9 +122,8 @@ def _define_speakers_with_llm(transcript_text, speaker_stats, llm_strategy, mode
     """Анализ транскрипции с помощью LLM"""
     # Получаем настройки LLM из session_state или используем значения по умолчанию
     llm_settings = get_state("llm_settings", {})
-    llm_provider = llm_settings.get("provider")
     temperature = llm_settings.get("temperature", 0.0)
-    max_tokens = llm_settings.get("max_tokens", 1024)
+    max_tokens = llm_settings.get("max_tokens", 2048)
 
     # Запускаем анализ с помощью LLM с параметрами из настроек
     analysis_results = identify_speakers_with_llm(
@@ -135,33 +135,10 @@ def _define_speakers_with_llm(transcript_text, speaker_stats, llm_strategy, mode
         max_tokens=max_tokens,
     )
 
-    # Данные о стоимости для текущего запроса
-    current_input_tokens = llm_strategy.get_input_tokens()
-    current_output_tokens = llm_strategy.get_output_tokens()
-    current_price = llm_strategy.get_full_price()
+    # Обновляем статистику LLM и получаем текущие метрики
+    llm_stats = update_llm_stats(llm_strategy, model_name)
 
-    # Обновляем общую статистику за сессию
-    if "total_llm_cost" not in st.session_state:
-        st.session_state.total_llm_cost = 0.0
-        st.session_state.total_input_tokens = 0
-        st.session_state.total_output_tokens = 0
-        st.session_state.total_calls = 0
-
-    st.session_state.total_llm_cost += current_price
-    st.session_state.total_input_tokens += current_input_tokens
-    st.session_state.total_output_tokens += current_output_tokens
-    st.session_state.total_calls += 1
-
-    # Обновляем статистику LLM
-    llm_stats = {
-        "input_tokens": current_input_tokens,
-        "output_tokens": current_output_tokens,
-        "cache_create_tokens": llm_strategy.get_cache_create_tokens(),
-        "cache_read_tokens": llm_strategy.get_cache_read_tokens(),
-        "full_price": current_price,
-        "model": model_name,
-        "provider": llm_provider,
-    }
+    # Сохраняем статистику текущего запроса
     update_state("llm_stats", llm_stats)
 
     return analysis_results

@@ -28,7 +28,7 @@ class AppConfig:
     default_temperature: float = 0.0
     default_max_tokens: int = 4096
 
-    # Настройки для транскрипции
+    # Настройки для транскрипции (Не используется)
     max_speakers: int = 10
 
     # Доступные LLM провайдеры

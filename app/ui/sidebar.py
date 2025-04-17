@@ -1,6 +1,8 @@
 import streamlit as st
 from utils.error_handler import safe_operation, ErrorType
 from utils.logger import log_info
+from utils.llm_stats import get_total_llm_stats, reset_llm_stats
+from ui.app_state import update_state
 
 
 def reset_app_state():
@@ -32,6 +34,9 @@ def reset_app_state():
 
         # Устанавливаем состояние file_status в начальное значение
         st.session_state.file_status = "not_uploaded"
+
+        # Сбрасываем статистику LLM
+        reset_llm_stats()
 
         log_info("Состояние приложения сброшено")
 
@@ -158,22 +163,14 @@ def display_llm_settings():
 
 
 def display_llm_stats():
-    st.sidebar.markdown("---")
     """Отображение статистики использования LLM"""
+    st.sidebar.markdown("---")
 
-    # Инициализируем отслеживание общей стоимости за сессию, если его еще нет
-    if "total_llm_cost" not in st.session_state:
-        st.session_state.total_llm_cost = 0.0
-        st.session_state.total_input_tokens = 0
-        st.session_state.total_output_tokens = 0
-        st.session_state.total_calls = 0
+    # Получаем общую статистику
+    total_stats = get_total_llm_stats()
 
-    if "llm_stats" in st.session_state and st.sidebar.toggle(
-        "Метрики", key="full_price_toggle"
-    ):
-        st.sidebar.metric(
-            "Полная стоимость", f"{100*st.session_state.total_llm_cost:.4f}¢"
-        )
+    if st.sidebar.toggle("Метрики", key="full_price_toggle"):
+        st.sidebar.metric("Полная стоимость", f"{100*total_stats['total_cost']:.4f}¢")
 
     if "llm_stats" in st.session_state and st.sidebar.toggle(
         "Статистика LLM", value=False, key="llm_stats_toggle"
@@ -182,23 +179,23 @@ def display_llm_stats():
 
         st.sidebar.subheader("Статистика использования LLM")
 
-        if stats["provider"] and stats["model"]:
+        if stats.get("model"):
             st.sidebar.markdown("**Последний запрос:**")
-            st.sidebar.markdown(f"**Провайдер:** {stats['provider']}")
             st.sidebar.markdown(f"**Модель:** {stats['model']}")
 
             # Токены последнего запроса
             st.sidebar.markdown("### Токены (последний запрос)")
             st.sidebar.markdown(f"- Входные: {stats['input_tokens']}")
             st.sidebar.markdown(f"- Выходные: {stats['output_tokens']}")
-            st.sidebar.markdown(
-                f"- Всего: {stats['input_tokens'] + stats['output_tokens']}"
-            )
-
-            # Кэш
-            st.sidebar.markdown("### Кэширование (последний запрос)")
             st.sidebar.markdown(f"- Создание кэша: {stats['cache_create_tokens']}")
             st.sidebar.markdown(f"- Чтение из кэша: {stats['cache_read_tokens']}")
+            total_tokens = (
+                stats["input_tokens"]
+                + stats["output_tokens"]
+                + stats["cache_create_tokens"]
+                + stats["cache_read_tokens"]
+            )
+            st.sidebar.markdown(f"- Всего: {total_tokens}")
 
             # Стоимость последнего запроса
             st.sidebar.markdown("### Стоимость (последний запрос)")
@@ -207,15 +204,21 @@ def display_llm_stats():
             # Общая статистика за всю сессию
             st.sidebar.markdown("---")
             st.sidebar.markdown("## Общая статистика за сессию")
-            st.sidebar.markdown(f"- Всего запросов: {st.session_state.total_calls}")
+            st.sidebar.markdown(f"- Всего запросов: {total_stats['total_calls']}")
             st.sidebar.markdown(
-                f"- Всего входных токенов: {st.session_state.total_input_tokens}"
+                f"- Всего входных токенов: {total_stats['total_input_tokens']}"
             )
             st.sidebar.markdown(
-                f"- Всего выходных токенов: {st.session_state.total_output_tokens}"
+                f"- Всего выходных токенов: {total_stats['total_output_tokens']}"
             )
             st.sidebar.markdown(
-                f"- **Общая стоимость**: ${st.session_state.total_llm_cost:.6f}"
+                f"- Всего токенов создания кэша: {total_stats['total_cache_create_tokens']}"
+            )
+            st.sidebar.markdown(
+                f"- Всего токенов чтения из кэша: {total_stats['total_cache_read_tokens']}"
+            )
+            st.sidebar.markdown(
+                f"- **Общая стоимость**: ${total_stats['total_cost']:.6f}"
             )
         else:
             st.sidebar.info("Статистика LLM будет доступна после использования модели")
@@ -248,6 +251,13 @@ def display_debug_panel():
             if reset_app_state():
                 st.sidebar.success("Состояние приложения сброшено")
                 st.rerun()
+
+        # Кнопка сброса статуса
+        if st.sidebar.button(
+            "Сбросить статус последнего шага", key="debug_reset_file_status_btn"
+        ):
+            update_state("file_status", "corrections_processed")
+            st.rerun()
 
         # Дополнительные инструменты отладки
         if st.sidebar.button("Показать session_state", key="debug_show_state_btn"):
