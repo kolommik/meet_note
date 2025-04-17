@@ -6,7 +6,6 @@ import streamlit as st
 import streamlit.components.v1 as components
 import base64
 from pathlib import Path
-from utils.error_handler import safe_operation, ErrorType
 from utils.file_handler import save_markdown_document
 from utils.llm_stats import update_llm_stats
 from ui.app_state import get_state, update_state
@@ -223,42 +222,3 @@ def create_download_button(content, filename, button_text="💾 Скачать �
 
     # Отображаем HTML
     components.html(html_code, height=60)
-
-
-def download_as_file(content, filename):
-    """
-    Создает элемент для скачивания контента как файла.
-
-    Args:
-        content: Содержимое файла
-        filename: Имя файла для скачивания
-    """
-    return safe_operation(
-        _download_as_file_impl,
-        ErrorType.UI_ERROR,
-        operation_name="Создание файла для скачивания",
-        content=content,
-        filename=filename,
-        default_return=None,
-    )
-
-
-def _download_as_file_impl(content, filename):
-    """
-    Внутренняя реализация для создания элемента скачивания файла
-
-    Args:
-        content: Содержимое файла
-        filename: Имя файла для скачивания
-    """
-    # Проверяем, что у файла правильное расширение
-    if not filename.endswith(".md"):
-        filename = f"{filename}.md"
-
-    # Создаем кнопку скачивания
-    st.download_button(
-        label="Скачать",
-        data=content,
-        file_name=filename,
-        mime="text/markdown",
-    )
