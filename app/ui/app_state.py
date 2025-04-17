@@ -34,6 +34,16 @@ def initialize_app_state():
     if "corrected_transcript" not in st.session_state:
         st.session_state.corrected_transcript = None
 
+    # Состояния для документов
+    if "transcript_document" not in st.session_state:
+        st.session_state.transcript_document = None
+    if "transcript_document_path" not in st.session_state:
+        st.session_state.transcript_document_path = None
+    if "meeting_summary" not in st.session_state:
+        st.session_state.meeting_summary = None
+    if "meeting_summary_path" not in st.session_state:
+        st.session_state.meeting_summary_path = None
+
     # LLM настройки и статистика
     if "llm_settings" not in st.session_state:
         st.session_state.llm_settings = {"temperature": 0.0, "max_tokens": 1024}
@@ -86,6 +96,10 @@ def clear_state():
         "speaker_updated_transcript",
         "correction_results",
         "corrected_transcript",
+        "transcript_document",
+        "transcript_document_path",
+        "meeting_summary",
+        "meeting_summary_path",
     ]
     for key in keys_to_clear:
         if key in st.session_state:

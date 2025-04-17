@@ -23,6 +23,10 @@ from ui.correction_components import (
     render_correction_controls,
     render_correction_content,
 )
+from ui.document_components import (
+    render_document_controls,
+    render_document_content,
+)
 
 
 def render_main_page():
@@ -57,14 +61,22 @@ def render_main_page():
     if file_status == "speakers_processed":
         render_correction_controls()
     else:
-        if file_status == "corrections_processed":
+        if file_status in ["corrections_processed", "documents_created"]:
             render_correction_content()
+
+    # Шаг 5: Создание документов по встрече
+    if file_status == "corrections_processed":
+        render_document_controls()
+    else:
+        if file_status == "documents_created":
+            render_document_content()
 
     if file_status in [
         "uploaded",
         "transcribed",
         "speakers_processed",
         "corrections_processed",
+        "documents_created",
     ]:
         st.markdown("---")
         render_delete_controls()

@@ -5,7 +5,7 @@
 """
 
 import re
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 import json
 from utils.prompts import PROMPTS
 from utils.error_handler import safe_operation, ErrorType
@@ -279,3 +279,190 @@ def _identify_corrections_with_llm_impl(
             "raw_response": response,
             "corrections": [],
         }
+
+
+def generate_transcript_document(
+    transcript_text: str,
+    analysis_results: Dict[str, Any],
+    llm_strategy: ChatModelStrategy,
+    model_name: str,
+    temperature: float = 0.0,
+    max_tokens: int = 2048,
+) -> str:
+    """
+    Генерирует документ транскрипта встречи с использованием LLM.
+
+    Args:
+        transcript_text: Текст транскрипции
+        analysis_results: Результаты анализа спикеров
+        llm_strategy: Стратегия для взаимодействия с LLM
+        model_name: Название модели для использования
+        temperature: Температура генерации (случайность)
+        max_tokens: Максимальное количество токенов в ответе
+
+    Returns:
+        str: Markdown-документ с транскриптом встречи
+    """
+    return safe_operation(
+        _generate_transcript_document_impl,
+        ErrorType.LLM_ERROR,
+        transcript_text=transcript_text,
+        analysis_results=analysis_results,
+        llm_strategy=llm_strategy,
+        model_name=model_name,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        default_return="# Документ транскрипта встречи\n\n*Не удалось сгенерировать документ.*",
+    )
+
+
+def _generate_transcript_document_impl(
+    transcript_text: str,
+    analysis_results: Dict[str, Any],
+    llm_strategy: ChatModelStrategy,
+    model_name: str,
+    temperature: float = 0.0,
+    max_tokens: int = 2048,
+) -> str:
+    """Внутренняя реализация генерации документа транскрипта с помощью LLM."""
+    # Подготовка информации об участниках
+    participants_info = ""
+    for speaker, data in analysis_results.get("speakers", {}).items():
+        name = data.get("name", "Неизвестно")
+        role = data.get("role", "Роль не определена")
+        participants_info += f"{speaker} - {name} ({role})\n"
+
+    # Составляем системный промпт из шаблона
+    system_prompt = PROMPTS["transcript_document_system"].format()
+
+    # Составляем сообщение пользователя из шаблона
+    user_message = PROMPTS["transcript_document_user"].format(
+        participants_info=participants_info, transcript_text=transcript_text
+    )
+
+    # Отправляем запрос к LLM с указанными параметрами
+    response = llm_strategy.send_message(
+        system_prompt=system_prompt,
+        messages=[{"role": "user", "content": user_message}],
+        model_name=model_name,
+        max_tokens=max_tokens,
+        temperature=temperature,
+    )
+
+    # Возвращаем сгенерированный документ
+    return response
+
+
+def generate_meeting_summary(
+    transcript_text: str,
+    analysis_results: Dict[str, Any],
+    llm_strategy: ChatModelStrategy,
+    model_name: str,
+    temperature: float = 0.0,
+    max_tokens: int = 2048,
+) -> str:
+    """
+    Генерирует документ с саммари встречи с использованием LLM.
+
+    Args:
+        transcript_text: Текст транскрипции
+        analysis_results: Результаты анализа спикеров
+        llm_strategy: Стратегия для взаимодействия с LLM
+        model_name: Название модели для использования
+        temperature: Температура генерации (случайность)
+        max_tokens: Максимальное количество токенов в ответе
+
+    Returns:
+        str: Markdown-документ с саммари встречи
+    """
+    return safe_operation(
+        _generate_meeting_summary_impl,
+        ErrorType.LLM_ERROR,
+        transcript_text=transcript_text,
+        analysis_results=analysis_results,
+        llm_strategy=llm_strategy,
+        model_name=model_name,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        default_return="# Саммари встречи\n\n*Не удалось сгенерировать саммари.*",
+    )
+
+
+def _generate_meeting_summary_impl(
+    transcript_text: str,
+    analysis_results: Dict[str, Any],
+    llm_strategy: ChatModelStrategy,
+    model_name: str,
+    temperature: float = 0.0,
+    max_tokens: int = 2048,
+) -> str:
+    """Внутренняя реализация генерации саммари встречи с помощью LLM."""
+    # Подготовка информации об участниках
+    participants_info = ""
+    for speaker, data in analysis_results.get("speakers", {}).items():
+        name = data.get("name", "Неизвестно")
+        role = data.get("role", "Роль не определена")
+        participants_info += f"{speaker} - {name} ({role})\n"
+
+    # Составляем системный промпт из шаблона
+    system_prompt = PROMPTS["meeting_summary_system"].format()
+
+    # Составляем сообщение пользователя из шаблона
+    user_message = PROMPTS["meeting_summary_user"].format(
+        participants_info=participants_info, transcript_text=transcript_text
+    )
+
+    # Отправляем запрос к LLM с указанными параметрами
+    response = llm_strategy.send_message(
+        system_prompt=system_prompt,
+        messages=[{"role": "user", "content": user_message}],
+        model_name=model_name,
+        max_tokens=max_tokens,
+        temperature=temperature,
+    )
+
+    # Возвращаем сгенерированный документ
+    return response
+
+
+def generate_meeting_documents(
+    transcript_text: str,
+    analysis_results: Dict[str, Any],
+    llm_strategy: ChatModelStrategy,
+    model_name: str,
+    temperature: float = 0.0,
+    max_tokens: int = 2048,
+) -> Tuple[str, str]:
+    """
+    Генерирует оба документа по встрече: транскрипт и саммари.
+
+    Args:
+        transcript_text: Текст транскрипции
+        analysis_results: Результаты анализа спикеров
+        llm_strategy: Стратегия для взаимодействия с LLM
+        model_name: Название модели для использования
+        temperature: Температура генерации (случайность)
+        max_tokens: Максимальное количество токенов в ответе
+
+    Returns:
+        Tuple[str, str]: Tuple из двух Markdown-документов (транскрипт, саммари)
+    """
+    transcript_doc = generate_transcript_document(
+        transcript_text=transcript_text,
+        analysis_results=analysis_results,
+        llm_strategy=llm_strategy,
+        model_name=model_name,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+
+    summary_doc = generate_meeting_summary(
+        transcript_text=transcript_text,
+        analysis_results=analysis_results,
+        llm_strategy=llm_strategy,
+        model_name=model_name,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+
+    return transcript_doc, summary_doc
