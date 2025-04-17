@@ -50,7 +50,7 @@ def render_transcript_content():
     """Отрисовка содержимого транскрипции"""
     transcript_text = get_state("transcript_text")
     if transcript_text:
-        if st.toggle("Результаты распознавания", value=True, key="transcribed_toggle"):
+        if st.toggle("Результаты распознавания", value=False, key="transcribed_toggle"):
             st.subheader("Результаты распознавания речи")
             # Отображаем текст
             st.text_area(

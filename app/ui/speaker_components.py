@@ -104,7 +104,7 @@ def render_speaker_define_content():
     speaker_updated_text = get_state("speaker_updated_transcript")
     if speaker_updated_text:
         if st.toggle(
-            "Транскрипция с именами спикеров", value=True, key="speaker_define_toggle"
+            "Транскрипция с именами спикеров", value=False, key="speaker_define_toggle"
         ):
             st.subheader("Обновленная транскрипция")
             # Отображаем текст

@@ -107,7 +107,7 @@ def render_correction_controls():
 
 def render_correction_content():
     """Показываем результаты с исправлениями ошибок распознавания"""
-    if st.toggle("Исправленная транскрипция", value=True, key="correction_toggle"):
+    if st.toggle("Исправленная транскрипция", value=False, key="correction_toggle"):
         corrected_text = get_state("corrected_transcript")
 
         if corrected_text:
