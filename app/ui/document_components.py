@@ -50,14 +50,52 @@ def render_document_controls():
         )
         return
 
+    # Дополнительные настройки для генерации больших документов
+    with st.expander("Расширенные настройки генерации"):
+        st.info(
+            "Эти настройки влияют на генерацию больших документов. "
+            "Для обычных документов (до 2000 слов) стандартные настройки должны подходить."
+        )
+
+        max_tokens_per_chunk = st.slider(
+            "Максимальное количество токенов на одну часть документа",
+            min_value=512,
+            max_value=4096,
+            value=2048,
+            step=256,
+            help="Ограничивает размер каждой части документа при генерации больших документов. "
+            "Чем больше значение, тем меньше запросов к API будет выполнено, "
+            "но тем выше риск превышения лимита.",
+        )
+
+        show_progress = st.checkbox(
+            "Показывать прогресс генерации",
+            value=True,
+            help="Отображает промежуточные результаты генерации документа",
+        )
+
     # Кнопка для генерации документов
     documents_exist = get_state("transcript_document") and get_state("meeting_summary")
     button_text = "Обновить документы" if documents_exist else "Создать документы"
 
     if st.button(button_text, type="primary"):
+        # Обновляем значение max_tokens на основе слайдера
+        max_tokens = max_tokens_per_chunk
+
+        # Создаем прогресс бар, если выбрано отображение прогресса
+        if show_progress:
+            progress_bar = st.progress(0)
+            progress_status = st.empty()
+            progress_status.text("Подготовка к генерации документов...")
+
         with st.spinner("Генерация документов..."):
             # Генерируем документы
             try:
+                # Уведомляем о начале процесса генерации
+                if show_progress:
+                    progress_status.text("Генерация документа транскрипта...")
+                    progress_bar.progress(10)
+
                 transcript_doc, summary_doc = generate_meeting_documents(
                     transcript_text=transcript_text,
                     analysis_results=analysis_results,
@@ -66,6 +104,13 @@ def render_document_controls():
                     temperature=temperature,
                     max_tokens=max_tokens,
                 )
+
+                # Обновляем прогресс
+                if show_progress:
+                    progress_status.text(
+                        "Документы сгенерированы. Сохранение результатов..."
+                    )
+                    progress_bar.progress(90)
 
                 # Сохраняем документы в файлы
                 file_base_name = Path(get_state("file_path", "meeting")).stem
@@ -97,9 +142,17 @@ def render_document_controls():
                     },
                 )
 
+                # Завершаем прогресс
+                if show_progress:
+                    progress_status.text("Документы успешно созданы!")
+                    progress_bar.progress(100)
+
                 st.success("Документы успешно созданы!")
                 st.rerun()
             except Exception as e:
+                if show_progress:
+                    progress_status.text(f"Ошибка при создании документов: {str(e)}")
+                    progress_bar.empty()
                 st.error(f"Ошибка при создании документов: {str(e)}")
 
 
@@ -118,6 +171,9 @@ def render_document_content():
     transcript_doc_path = get_state("transcript_document_path", "")
     summary_doc_path = get_state("meeting_summary_path", "")
 
+    # Получаем базовое имя исходного файла для использования при скачивании
+    file_base_name = Path(get_state("file_path", "meeting")).stem
+
     # Создаем вкладки для отображения документов
     doc_tab1, doc_tab2 = st.tabs(["Транскрипт встречи", "Саммари встречи"])
 
@@ -127,7 +183,9 @@ def render_document_content():
         with col1:
             if transcript_doc_path:
                 create_download_button(
-                    transcript_doc, "transcript.md", "Скачать документ"
+                    transcript_doc,
+                    f"{file_base_name}_transcript.md",
+                    "Скачать документ",
                 )
 
     with doc_tab2:
@@ -135,7 +193,9 @@ def render_document_content():
         col1, col2 = st.columns([1, 4])
         with col1:
             if summary_doc_path:
-                create_download_button(summary_doc, "summary.md", "Скачать документ")
+                create_download_button(
+                    summary_doc, f"{file_base_name}_summary.md", "Скачать документ"
+                )
 
 
 def create_download_button(content, filename, button_text="Скачать"):
