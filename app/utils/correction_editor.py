@@ -49,10 +49,42 @@ def _display_correction_editor_impl(
     """
     )
 
+    # Проверяем наличие ошибки парсинга
+    if correction_results.get("parsing_error"):
+        st.error(
+            """
+        Произошла ошибка при анализе ответа LLM.
+        Возможно, модель вернула ответ в неожиданном формате или возникла проблема с парсингом JSON.
+
+        Попробуйте запустить анализ еще раз с другими настройками модели
+        (например, снизив температуру до 0 или выбрав другую модель).
+        """
+        )
+        # Показываем часть сырого ответа для отладки
+        with st.expander("Показать детали ошибки"):
+            st.code(
+                correction_results.get("raw_response", "Нет дополнительной информации")
+            )
+        return None
+
     # Проверяем наличие исправлений
     corrections = correction_results.get("corrections", [])
     if not corrections:
-        st.warning("LLM не обнаружил ошибок распознавания в тексте.")
+        st.warning(
+            """
+        LLM не обнаружил ошибок распознавания в тексте.
+
+        Это может быть по одной из следующих причин:
+        1. В тексте действительно нет ошибок распознавания
+        2. Модель не смогла идентифицировать термины, требующие исправления
+        3. Не хватает контекстной информации для определения ошибок
+
+        Попробуйте:
+        - Добавить больше контекстной информации в файл terms.md
+        - Выбрать другую модель или увеличить значение max_tokens
+        - Используйте более специализированную модель для технических текстов
+        """
+        )
         return None
 
     # Инициализируем состояние для хранения пользовательских исправлений если его нет
@@ -69,6 +101,19 @@ def _display_correction_editor_impl(
 
     # Отображаем заголовок со статистикой исправлений
     st.markdown(f"#### Найдено {len(corrections)} потенциальных ошибок распознавания")
+
+    # Добавляем кнопки для выбора всех/отмены всех исправлений
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Выбрать все"):
+            for original in st.session_state.selected_corrections:
+                st.session_state.selected_corrections[original] = True
+            st.rerun()
+    with col2:
+        if st.button("Отменить все"):
+            for original in st.session_state.selected_corrections:
+                st.session_state.selected_corrections[original] = False
+            st.rerun()
 
     # Создаем форму для редактирования исправлений
     with st.form("correction_edit_form"):
