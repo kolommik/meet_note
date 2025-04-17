@@ -1,284 +1,61 @@
 """
-Модуль для анализа транскрипций аудиофайлов.
-Содержит функции для сбора статистики по спикерам и определения
-их имен и ролей с помощью LLM, а также для исправления ошибок распознавания.
+Модуль для генерации документов на основе транскрипций.
+Содержит функции для создания транскрипта встречи,
+саммари и других документов с помощью LLM.
 """
 
 import re
-from typing import Dict, Any, Optional, Tuple, List
-import json
+from typing import Dict, Any, List, Tuple
 from utils.prompts import PROMPTS
 from utils.error_handler import safe_operation, ErrorType
-from llm_strategies.chat_model_strategy import ChatModelStrategy
 
 
-def calculate_speaker_statistics(transcript_text: str) -> Dict[str, Dict[str, Any]]:
+def _split_transcript_for_processing(
+    transcript_text: str, max_chunk_size: int = 4000
+) -> List[str]:
     """
-    Подсчитывает статистику для каждого спикера в транскрипции.
+    Разделяет текст транскрипта на разумные части для обработки.
+
+    Разделение происходит на границах высказываний, чтобы сохранить целостность реплик.
 
     Args:
-        transcript_text: Текст транскрипции в формате 'speaker_X: текст'
+        transcript_text: Полный текст транскрипта
+        max_chunk_size: Максимальный размер одной части в символах
 
     Returns:
-        Dict: Словарь со статистикой по каждому спикеру и общими данными
+        List[str]: Список частей транскрипта
     """
-    return safe_operation(
-        _calculate_speaker_statistics_impl,
-        ErrorType.TRANSCRIPTION_ERROR,
-        transcript_text=transcript_text,
-        default_return={},
-    )
+    # Если текст короткий, возвращаем его целиком
+    if len(transcript_text) <= max_chunk_size:
+        return [transcript_text]
 
-
-def _calculate_speaker_statistics_impl(
-    transcript_text: str,
-) -> Dict[str, Dict[str, Any]]:
-    """Внутренняя реализация расчета статистики спикеров."""
     # Регулярное выражение для поиска паттернов "speaker_X: текст"
     pattern = r"(speaker_\d+):\s+(.*?)(?=\n(?:speaker_\d+):|$)"
 
     # Поиск всех совпадений
     matches = re.findall(pattern, transcript_text, re.DOTALL)
 
-    # Словарь для хранения данных по каждому спикеру
-    speaker_stats = {}
-    total_words = 0
+    # Формируем части транскрипта
+    chunks = []
+    current_chunk = ""
 
-    # Обрабатываем каждое совпадение
     for speaker, text in matches:
-        # Подсчитываем слова в высказывании (разделяем по пробелам)
-        words = text.strip().split()
-        word_count = len(words)
-        total_words += word_count
+        # Формируем текущую реплику
+        utterance = f"{speaker}: {text}\n"
 
-        # Если спикер уже есть в словаре, обновляем его статистику
-        if speaker in speaker_stats:
-            speaker_stats[speaker]["word_count"] += word_count
-            speaker_stats[speaker]["utterances"] += 1
+        # Если добавление этой реплики превысит максимальный размер части,
+        # добавляем текущую часть в список и начинаем новую
+        if len(current_chunk) + len(utterance) > max_chunk_size and current_chunk:
+            chunks.append(current_chunk)
+            current_chunk = utterance
         else:
-            # Иначе создаем новую запись
-            speaker_stats[speaker] = {"word_count": word_count, "utterances": 1}
+            current_chunk += utterance
 
-    # Рассчитываем процент для каждого спикера
-    for speaker in speaker_stats:
-        speaker_stats[speaker]["percentage"] = round(
-            (speaker_stats[speaker]["word_count"] / total_words) * 100, 2
-        )
+    # Добавляем последнюю часть, если она не пуста
+    if current_chunk:
+        chunks.append(current_chunk)
 
-    # Добавляем общую статистику
-    speaker_stats["total"] = {
-        "word_count": total_words,
-        "utterances": sum(
-            s["utterances"]
-            for s in speaker_stats.values()
-            if s != speaker_stats.get("total", None)
-        ),
-        "speakers_count": len(speaker_stats),
-    }
-
-    return speaker_stats
-
-
-def identify_speakers_with_llm(
-    transcript_text: str,
-    speaker_stats: Dict[str, Dict[str, Any]],
-    llm_strategy: ChatModelStrategy,
-    model_name: str,
-    temperature: float = 0.0,
-    max_tokens: int = 1024,
-) -> Dict[str, Any]:
-    """
-    Использует LLM для определения имен спикеров и анализа разговора.
-
-    Args:
-        transcript_text: Текст транскрипции
-        speaker_stats: Статистика по спикерам (из calculate_speaker_statistics)
-        llm_strategy: Стратегия для взаимодействия с LLM
-        model_name: Название модели для использования
-        temperature: Температура генерации (случайность)
-        max_tokens: Максимальное количество токенов в ответе
-
-    Returns:
-        Dict: Результаты анализа LLM
-    """
-    return safe_operation(
-        _identify_speakers_with_llm_impl,
-        ErrorType.LLM_ERROR,
-        transcript_text=transcript_text,
-        speaker_stats=speaker_stats,
-        llm_strategy=llm_strategy,
-        model_name=model_name,
-        temperature=temperature,
-        max_tokens=max_tokens,
-        default_return={
-            "error": "Ошибка при анализе с помощью LLM",
-            "speakers": {},
-            "summary": "Не удалось получить результаты анализа",
-        },
-    )
-
-
-def _identify_speakers_with_llm_impl(
-    transcript_text: str,
-    speaker_stats: Dict[str, Dict[str, Any]],
-    llm_strategy: ChatModelStrategy,
-    model_name: str,
-    temperature: float = 0.0,
-    max_tokens: int = 1024,
-) -> Dict[str, Any]:
-    """Внутренняя реализация анализа спикеров с помощью LLM."""
-    # Подготовка статистики для включения в промпт
-    stats_text = ""
-    for speaker, data in speaker_stats.items():
-        if speaker != "total":
-            stats_text += f"{speaker}: {data['word_count']} слов, {data['percentage']}% от общего объема\n"
-
-    # Составляем системный промпт из шаблона
-    system_prompt = PROMPTS["transcript_analysis_system"].format()
-
-    # Составляем сообщение пользователя из шаблона
-    user_message = PROMPTS["transcript_analysis_user"].format(
-        stats_text=stats_text, transcript_text=transcript_text
-    )
-
-    # Отправляем запрос к LLM с указанными параметрами
-    response = llm_strategy.send_message(
-        system_prompt=system_prompt,
-        messages=[{"role": "user", "content": user_message}],
-        model_name=model_name,
-        max_tokens=max_tokens,
-        temperature=temperature,
-    )
-
-    # Пытаемся распарсить JSON из ответа
-    try:
-        # Ищем JSON в ответе
-        json_match = re.search(r"```json\s*(.*?)\s*```", response, re.DOTALL)
-
-        if json_match:
-            json_str = json_match.group(1)
-        else:
-            # Если JSON не обернут в код, пробуем использовать весь ответ
-            json_str = response
-
-        # Пытаемся распарсить JSON
-        analysis_results = json.loads(json_str)
-
-        # Объединяем результаты со статистикой
-        for speaker, data in analysis_results.get("speakers", {}).items():
-            if speaker in speaker_stats and speaker != "total":
-                # Добавляем статистику к результатам анализа
-                data["statistics"] = {
-                    "word_count": speaker_stats[speaker]["word_count"],
-                    "percentage": speaker_stats[speaker]["percentage"],
-                    "utterances": speaker_stats[speaker]["utterances"],
-                }
-
-        return analysis_results
-
-    except json.JSONDecodeError:
-        # Если не удалось распарсить JSON, возвращаем сырой ответ
-        return {
-            "error": "Не удалось распарсить ответ в формате JSON",
-            "raw_response": response,
-        }
-
-
-def identify_corrections_with_llm(
-    transcript_text: str,
-    context_text: Optional[str],
-    llm_strategy: ChatModelStrategy,
-    model_name: str,
-    temperature: float = 0.0,
-    max_tokens: int = 1024,
-) -> Dict[str, Any]:
-    """
-    Использует LLM для поиска и исправления ошибок распознавания в транскрипции.
-
-    Args:
-        transcript_text: Текст транскрипции с именами спикеров
-        context_text: Дополнительный контекст для улучшения распознавания (может быть None)
-        llm_strategy: Стратегия для взаимодействия с LLM
-        model_name: Название модели для использования
-        temperature: Температура генерации (случайность)
-        max_tokens: Максимальное количество токенов в ответе
-
-    Returns:
-        Dict: Результаты анализа ошибок распознавания
-    """
-    return safe_operation(
-        _identify_corrections_with_llm_impl,
-        ErrorType.LLM_ERROR,
-        transcript_text=transcript_text,
-        context_text=context_text,
-        llm_strategy=llm_strategy,
-        model_name=model_name,
-        temperature=temperature,
-        max_tokens=max_tokens,
-        default_return={
-            "error": "Ошибка при анализе ошибок распознавания с помощью LLM",
-            "corrections": [],
-        },
-    )
-
-
-def _identify_corrections_with_llm_impl(
-    transcript_text: str,
-    context_text: Optional[str],
-    llm_strategy: ChatModelStrategy,
-    model_name: str,
-    temperature: float = 0.0,
-    max_tokens: int = 1024,
-) -> Dict[str, Any]:
-    """Внутренняя реализация анализа ошибок распознавания с помощью LLM."""
-    # Проверяем наличие контекста и устанавливаем значение по умолчанию
-    if context_text is None:
-        context_text = "Контекстная информация отсутствует."
-
-    # Составляем системный промпт из шаблона
-    system_prompt = PROMPTS["transcript_correction_system"].format()
-
-    # Составляем сообщение пользователя из шаблона
-    user_message = PROMPTS["transcript_correction_user"].format(
-        context_text=context_text, transcript_text=transcript_text
-    )
-
-    # Отправляем запрос к LLM с указанными параметрами
-    response = llm_strategy.send_message(
-        system_prompt=system_prompt,
-        messages=[{"role": "user", "content": user_message}],
-        model_name=model_name,
-        max_tokens=max_tokens,
-        temperature=temperature,
-    )
-
-    # Пытаемся распарсить JSON из ответа
-    try:
-        # Ищем JSON в ответе
-        json_match = re.search(r"```json\s*(.*?)\s*```", response, re.DOTALL)
-
-        if json_match:
-            json_str = json_match.group(1)
-        else:
-            # Если JSON не обернут в код, пробуем использовать весь ответ
-            json_str = response
-
-        # Пытаемся распарсить JSON
-        correction_results = json.loads(json_str)
-
-        # Проверяем наличие ключа corrections в ответе
-        if "corrections" not in correction_results:
-            correction_results["corrections"] = []
-
-        return correction_results
-
-    except json.JSONDecodeError:
-        # Если не удалось распарсить JSON, возвращаем сырой ответ
-        return {
-            "error": "Не удалось распарсить ответ в формате JSON",
-            "raw_response": response,
-            "corrections": [],
-        }
+    return chunks
 
 
 def generate_large_document(
@@ -286,7 +63,7 @@ def generate_large_document(
     initial_message: str,
     continuation_data: List[str],
     continuation_instruction: str,
-    llm_strategy: ChatModelStrategy,
+    llm_strategy,
     model_name: str,
     temperature: float = 0.0,
     max_tokens_per_request: int = 2048,
@@ -333,7 +110,7 @@ def _generate_large_document_impl(
     initial_message: str,
     continuation_data: List[str],
     continuation_instruction: str,
-    llm_strategy: ChatModelStrategy,
+    llm_strategy,
     model_name: str,
     temperature: float = 0.0,
     max_tokens_per_request: int = 2048,
@@ -387,58 +164,10 @@ def _generate_large_document_impl(
     return current_document
 
 
-def _split_transcript_for_processing(
-    transcript_text: str, max_chunk_size: int = 4000
-) -> List[str]:
-    """
-    Разделяет текст транскрипта на разумные части для обработки.
-
-    Разделение происходит на границах высказываний, чтобы сохранить целостность реплик.
-
-    Args:
-        transcript_text: Полный текст транскрипта
-        max_chunk_size: Максимальный размер одной части в символах
-
-    Returns:
-        List[str]: Список частей транскрипта
-    """
-    # Если текст короткий, возвращаем его целиком
-    if len(transcript_text) <= max_chunk_size:
-        return [transcript_text]
-
-    # Регулярное выражение для поиска паттернов "speaker_X: текст"
-    pattern = r"(speaker_\d+):\s+(.*?)(?=\n(?:speaker_\d+):|$)"
-
-    # Поиск всех совпадений
-    matches = re.findall(pattern, transcript_text, re.DOTALL)
-
-    # Формируем части транскрипта
-    chunks = []
-    current_chunk = ""
-
-    for speaker, text in matches:
-        # Формируем текущую реплику
-        utterance = f"{speaker}: {text}\n"
-
-        # Если добавление этой реплики превысит максимальный размер части,
-        # добавляем текущую часть в список и начинаем новую
-        if len(current_chunk) + len(utterance) > max_chunk_size and current_chunk:
-            chunks.append(current_chunk)
-            current_chunk = utterance
-        else:
-            current_chunk += utterance
-
-    # Добавляем последнюю часть, если она не пуста
-    if current_chunk:
-        chunks.append(current_chunk)
-
-    return chunks
-
-
 def generate_transcript_document(
     transcript_text: str,
     analysis_results: Dict[str, Any],
-    llm_strategy: ChatModelStrategy,
+    llm_strategy,
     model_name: str,
     temperature: float = 0.0,
     max_tokens: int = 2048,
@@ -503,7 +232,7 @@ def generate_transcript_document(
 def generate_meeting_summary(
     transcript_text: str,
     analysis_results: Dict[str, Any],
-    llm_strategy: ChatModelStrategy,
+    llm_strategy,
     model_name: str,
     temperature: float = 0.0,
     max_tokens: int = 2048,
@@ -569,7 +298,7 @@ def generate_meeting_summary(
 def generate_meeting_documents(
     transcript_text: str,
     analysis_results: Dict[str, Any],
-    llm_strategy: ChatModelStrategy,
+    llm_strategy,
     model_name: str,
     temperature: float = 0.0,
     max_tokens: int = 2048,

@@ -8,7 +8,7 @@ from pathlib import Path
 from utils.error_handler import safe_operation, ErrorType
 from utils.file_handler import save_markdown_document
 from ui.app_state import get_state, update_state
-from utils.transcript_analysis import generate_meeting_documents
+from utils.document_generation import generate_meeting_documents
 
 
 def render_document_controls():

@@ -7,7 +7,7 @@
 import streamlit as st
 from utils.error_handler import safe_operation, ErrorType
 from utils.logger import log_info
-from utils.transcript_analysis import (
+from utils.speaker_analysis import (
     calculate_speaker_statistics,
     identify_speakers_with_llm,
 )

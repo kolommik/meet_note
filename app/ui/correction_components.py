@@ -8,7 +8,7 @@ import streamlit as st
 import os
 from utils.error_handler import safe_operation, ErrorType
 from utils.logger import log_info
-from utils.transcript_analysis import identify_corrections_with_llm
+from utils.transcript_correction import identify_corrections_with_llm
 from utils.correction_editor import display_correction_editor
 from ui.app_state import get_state, update_state
 from utils.speech_to_text import get_transcript_file_path
