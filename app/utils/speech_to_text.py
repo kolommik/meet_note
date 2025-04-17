@@ -1,7 +1,6 @@
 import os
 import requests
 import json
-import streamlit as st
 from utils.logger import log_info
 from utils.error_handler import safe_operation, ErrorType
 from utils.config import get_config
@@ -46,7 +45,7 @@ def _generate_human_readable_transcript_impl(transcript_data):
         lines.append(transcript_data.get("text", "Text not recognized."))
         return "\n".join(lines)
 
-    # Список аудио-событий
+    # Список аудио-событий (будут игнорироваться)
     audio_events = []
 
     # Текущая информация об отрезке речи
@@ -87,11 +86,6 @@ def _generate_human_readable_transcript_impl(transcript_data):
     if current_speaker is not None and current_text:
         speaker_text = " ".join(current_text)
         lines.append(f"{current_speaker}: {speaker_text}")
-
-    # Добавляем аудио-события в начало, если они есть
-    if audio_events:
-        lines.insert(0, " ".join(audio_events))
-        lines.insert(1, "")
 
     return "\n".join(lines)
 
