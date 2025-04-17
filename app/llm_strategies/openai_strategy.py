@@ -71,6 +71,18 @@ class OpenAIChatStrategy(BaseChatModelStrategy):
                 price_output=4.40,
             ),
             Model(
+                name="o3",
+                output_max_tokens=100_000,
+                price_input=10.0,
+                price_output=40.0,
+            ),
+            Model(
+                name="o4-mini",
+                output_max_tokens=100_000,
+                price_input=1.10,
+                price_output=4.40,
+            ),
+            Model(
                 name="o1",
                 output_max_tokens=32_768,
                 price_input=15.00,
