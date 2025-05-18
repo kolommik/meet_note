@@ -10,7 +10,7 @@ from utils.file_handler import save_markdown_document
 from utils.llm_stats import update_llm_stats
 from ui.app_state import get_state, update_state
 from ui.ui_components import copy_button
-from utils.document_generation import generate_meeting_documents
+from utils.document_generation import generate_meeting_summary
 
 
 def render_document_controls():
@@ -52,53 +52,16 @@ def render_document_controls():
         )
         return
 
-    # Дополнительные настройки для генерации больших документов
-    with st.expander("Расширенные настройки генерации"):
-        st.info(
-            "Эти настройки влияют на генерацию больших документов. "
-            "Для обычных документов (до 2000 слов) стандартные настройки должны подходить."
-        )
-
-        max_tokens_per_chunk = st.slider(
-            "Максимальное количество токенов на одну часть документа",
-            min_value=512,
-            max_value=4096,
-            value=2048,
-            step=256,
-            help="Ограничивает размер каждой части документа при генерации больших документов. "
-            "Чем больше значение, тем меньше запросов к API будет выполнено, "
-            "но тем выше риск превышения лимита.",
-        )
-
-        show_progress = st.checkbox(
-            "Показывать прогресс генерации",
-            value=True,
-            help="Отображает промежуточные результаты генерации документа",
-        )
-
     # Кнопка для генерации документов
     documents_exist = get_state("transcript_document") and get_state("meeting_summary")
     button_text = "Обновить документы" if documents_exist else "Создать документы"
 
     if st.button(button_text, type="primary"):
-        # Обновляем значение max_tokens на основе слайдера
-        max_tokens = max_tokens_per_chunk
-
-        # Создаем прогресс бар, если выбрано отображение прогресса
-        if show_progress:
-            progress_bar = st.progress(0)
-            progress_status = st.empty()
-            progress_status.text("Подготовка к генерации документов...")
 
         with st.spinner("Генерация документов..."):
             # Генерируем документы
             try:
-                # Уведомляем о начале процесса генерации
-                if show_progress:
-                    progress_status.text("Генерация документа транскрипта...")
-                    progress_bar.progress(10)
-
-                transcript_doc, summary_doc = generate_meeting_documents(
+                summary_doc = generate_meeting_summary(
                     transcript_text=transcript_text,
                     analysis_results=analysis_results,
                     llm_strategy=llm_strategy,
@@ -107,12 +70,7 @@ def render_document_controls():
                     max_tokens=max_tokens,
                 )
 
-                # Обновляем прогресс
-                if show_progress:
-                    progress_status.text(
-                        "Документы сгенерированы. Сохранение результатов..."
-                    )
-                    progress_bar.progress(90)
+                transcript_doc = transcript_text
 
                 # Сохраняем документы в файлы
                 file_base_name = Path(get_state("file_path", "meeting")).stem
@@ -134,17 +92,9 @@ def render_document_controls():
                 llm_stats = update_llm_stats(llm_strategy, model_name)
                 update_state("llm_stats", llm_stats)
 
-                # Завершаем прогресс
-                if show_progress:
-                    progress_status.text("Документы успешно созданы!")
-                    progress_bar.progress(100)
-
                 st.success("Документы успешно созданы!")
                 st.rerun()
             except Exception as e:
-                if show_progress:
-                    progress_status.text(f"Ошибка при создании документов: {str(e)}")
-                    progress_bar.empty()
                 st.error(f"Ошибка при создании документов: {str(e)}")
 
 
