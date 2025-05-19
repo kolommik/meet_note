@@ -120,7 +120,6 @@ def render_document_content():
     doc_tab1, doc_tab2 = st.tabs(["Транскрипт встречи", "Саммари встречи"])
 
     with doc_tab1:
-        st.markdown(transcript_doc)
         col1, col2, _ = st.columns([1, 1, 1])
         with col1:
             if transcript_doc_path:
@@ -129,15 +128,21 @@ def render_document_content():
                 )
         with col2:
             copy_button(transcript_doc)
+        st.text_area(
+            "Транскрипт встречи",
+            transcript_doc,
+            height=250,
+            key="transcript_doc_area",
+        )
 
     with doc_tab2:
-        st.markdown(summary_doc)
         col1, col2, _ = st.columns([1, 1, 1])
         with col1:
             if summary_doc_path:
                 create_download_button(summary_doc, f"{file_base_name}_summary.md")
         with col2:
             copy_button(summary_doc)
+        st.markdown(summary_doc)
 
 
 def create_download_button(content, filename, button_text="💾 Скачать документ"):
