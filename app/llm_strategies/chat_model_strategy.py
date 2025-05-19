@@ -16,7 +16,7 @@
 паттерну Стратегия.
 """
 
-from typing import List, Dict
+from typing import List, Dict, Tuple, Optional
 from abc import ABC, abstractmethod
 
 
@@ -44,7 +44,9 @@ class ChatModelStrategy(ABC):
     get_full_price()
         Рассчитывает и возвращает полную стоимость на основе входных и выходных токенов.
     send_message(system_prompt, messages, model_name, max_tokens, temperature)
-        Отправляет сообщение к API чат-модели и возвращает сгенерированный ответ.
+        Отправляет одиночное сообщение к API чат-модели и возвращает ответ и причину завершения.
+    generate_full_response(system_prompt, initial_user_message, model_name, max_tokens_per_chunk, temperature, ...)
+        Отправляет сообщение и автоматически обрабатывает продолжения для получения полного ответа.
     """
 
     @abstractmethod
@@ -79,48 +81,53 @@ class ChatModelStrategy(ABC):
     @abstractmethod
     def get_input_tokens(self) -> int:
         """
-        Возвращает количество входных токенов, использованных в последнем API-запросе.
+        Возвращает количество входных токенов, использованных в последнем API-запросе
+        (или сумму токенов, если использовался generate_full_response).
 
         Returns
         -------
         int
-            Количество входных токенов, использованных в последнем API-запросе.
+            Количество входных токенов.
         """
         pass
 
     @abstractmethod
     def get_output_tokens(self) -> int:
         """
-        Возвращает количество выходных токенов, сгенерированных в последнем API-ответе.
+        Возвращает количество выходных токенов, сгенерированных в последнем API-ответе
+        (или сумму токенов, если использовался generate_full_response).
 
         Returns
         -------
         int
-            Количество выходных токенов, сгенерированных в последнем API-ответе.
+            Количество выходных токенов.
         """
         pass
 
     @abstractmethod
     def get_cache_create_tokens(self) -> int:
         """
-        Возвращает количество токенов, используемых для создания кэша в последнем API-запросе.
+        Возвращает количество токенов, используемых для создания кэша.
+        (или сумму токенов, если использовался generate_full_response).
+
 
         Returns
         -------
         int
-            Количество токенов создания кэша в последнем API-ответе.
+            Количество токенов создания кэша.
         """
         pass
 
     @abstractmethod
     def get_cache_read_tokens(self) -> int:
         """
-        Возвращает количество токенов, прочитанных из кэша в последнем API-запросе.
+        Возвращает количество токенов, прочитанных из кэша.
+        (или сумму токенов, если использовался generate_full_response).
 
         Returns
         -------
         int
-            Количество токенов чтения из кэша в последнем API-ответе.
+            Количество токенов чтения из кэша.
         """
         pass
 
@@ -144,16 +151,17 @@ class ChatModelStrategy(ABC):
         model_name: str,
         max_tokens: int,
         temperature: float,
-    ) -> str:
+    ) -> Tuple[str, Optional[str]]:
         """
-        Отправляет сообщение к API чат-модели и возвращает сгенерированный ответ.
+        Отправляет одиночное сообщение к API чат-модели и возвращает сгенерированный ответ
+        и причину завершения генерации.
 
         Parameters
         ----------
         system_prompt : str
             Системный промпт для контекста разговора.
         messages : List[Dict[str, str]]
-            Список сообщений в разговоре, каждое представлено в виде словаря.
+            Список сообщений в разговоре (только user/assistant).
         model_name : str
             Название модели для генерации ответа.
         max_tokens : int
@@ -163,7 +171,49 @@ class ChatModelStrategy(ABC):
 
         Returns
         -------
+        Tuple[str, Optional[str]]
+            Кортеж: (сгенерированный ответ от API чат-модели, причина завершения генерации).
+        """
+        pass
+
+    @abstractmethod
+    def generate_full_response(
+        self,
+        system_prompt: str,
+        initial_user_message: str,
+        model_name: str,
+        max_tokens_per_chunk: int,
+        temperature: float,
+        max_continuation_attempts: int = 3,
+        continuation_prompt_template: str = "Please continue exactly from where it left off.",
+    ) -> str:
+        """
+        Отправляет начальное сообщение и, при необходимости, автоматически обрабатывает
+        продолжения для получения полного ответа от LLM, если ответ обрывается из-за лимита токенов.
+
+        Агрегирует статистику по токенам за все вызовы.
+
+        Parameters
+        ----------
+        system_prompt : str
+            Системный промпт.
+        initial_user_message : str
+            Начальное сообщение от пользователя.
+        model_name : str
+            Название модели.
+        max_tokens_per_chunk : int
+            Максимальное количество токенов для генерации в каждом отдельном запросе к API.
+        temperature : float
+            Температура генерации.
+        max_continuation_attempts : int, optional
+            Максимальное количество попыток продолжить генерацию, по умолчанию 3.
+        continuation_prompt_template : str, optional
+            Шаблон промпта для запроса продолжения.
+            По умолчанию используется шаблон, просящий продолжить с места обрыва.
+
+        Returns
+        -------
         str
-            Сгенерированный ответ от API чат-модели.
+            Полный (насколько возможно) сгенерированный ответ.
         """
         pass

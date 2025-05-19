@@ -71,12 +71,14 @@ def _identify_corrections_with_llm_impl(
     )
 
     # Отправляем запрос к LLM с указанными параметрами
-    response = llm_strategy.send_message(
+    response = llm_strategy.generate_full_response(
         system_prompt=system_prompt,
-        messages=[{"role": "user", "content": user_message}],
+        initial_user_message=user_message,
         model_name=model_name,
-        max_tokens=max_tokens,
+        max_tokens_per_chunk=max_tokens,
         temperature=temperature,
+        max_continuation_attempts=5,
+        continuation_prompt_template="Continue",
     )
 
     # Пытаемся распарсить JSON из ответа

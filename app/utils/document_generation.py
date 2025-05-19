@@ -48,7 +48,7 @@ def generate_meeting_summary(
         participants_info=participants_info, transcript_text=transcript_text
     )
 
-    summary_content = safe_operation(
+    summary_content, _ = safe_operation(
         llm_strategy.send_message,
         ErrorType.LLM_ERROR,
         system_prompt=system_prompt,

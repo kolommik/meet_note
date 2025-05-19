@@ -47,6 +47,11 @@ def log_info(message):
     logger.info(message)
 
 
+def log_warning(message):
+    """Записать warning сообщение в лог"""
+    logger.warning(message)
+
+
 def log_error(message):
     """Записать сообщение об ошибке в лог"""
     logger.error(message)

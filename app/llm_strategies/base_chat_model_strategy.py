@@ -5,7 +5,7 @@
 """
 
 from abc import abstractmethod
-from typing import List, Dict
+from typing import List, Dict, Tuple, Optional
 from llm_strategies.chat_model_strategy import ChatModelStrategy
 
 
@@ -81,11 +81,23 @@ class BaseChatModelStrategy(ChatModelStrategy):
         int
             Максимальное количество выходных токенов для указанной модели.
         """
-        return self.models[self.get_models().index(model_name)].output_max_tokens
+        # Проверка, существует ли модель
+        available_models = self.get_models()
+        if model_name not in available_models:
+            # Можно выбросить ошибку или вернуть значение по умолчанию/для первой модели
+            # ValueError(f"Модель '{model_name}' не найдена в списке доступных для этой стратегии.")
+            # Для безопасности, вернем 0 или значение для первой модели, если есть
+            if not self.models:
+                return 0
+            return self.models[
+                0
+            ].output_max_tokens  # Не очень хорошо, но лучше чем ошибка если не критично
+
+        return self.models[available_models.index(model_name)].output_max_tokens
 
     def get_input_tokens(self) -> int:
         """
-        Возвращает количество входных токенов, использованных в последнем запросе.
+        Возвращает количество входных токенов, использованных в последнем API-запросе.
 
         Returns
         -------
@@ -139,12 +151,14 @@ class BaseChatModelStrategy(ChatModelStrategy):
         float
             Полная стоимость запроса в долларах США.
         """
-        # Проверяем, инициализирована ли модель
-        if self.model is None:
-            return 0.0  # Возвращаем 0, если модель не определена
+        if self.model is None or not self.models:
+            return 0.0
 
-        model_index = self.get_models().index(self.model)
-        model_info = self.models[model_index]
+        try:
+            model_index = self.get_models().index(self.model)
+            model_info = self.models[model_index]
+        except ValueError:  # Если self.model не найден в списке
+            return 0.0
 
         # Базовая стоимость входных токенов
         inputs = self.input_tokens * model_info.price_input / 1_000_000.0
@@ -170,18 +184,21 @@ class BaseChatModelStrategy(ChatModelStrategy):
         model_name: str,
         max_tokens: int,
         temperature: float = 0,
-    ) -> str:
+    ) -> Tuple[str, Optional[str]]:
         """
-        Отправляет сообщение к LLM API и возвращает сгенерированный ответ.
+        Отправляет одиночное сообщение к API чат-модели и возвращает сгенерированный ответ
+        и причину завершения генерации.
 
         Этот метод должен быть реализован в конкретных стратегиях.
+        Он также должен обновлять self.input_tokens, self.output_tokens, и т.д.
+        для ЕДИНИЧНОГО вызова.
 
         Parameters
         ----------
         system_prompt : str
             Системный промпт для контекста разговора.
         messages : List[Dict[str, str]]
-            Список сообщений в разговоре, каждое представлено в виде словаря.
+            Список сообщений в разговоре (только user/assistant).
         model_name : str
             Название модели для генерации ответа.
         max_tokens : int
@@ -191,7 +208,49 @@ class BaseChatModelStrategy(ChatModelStrategy):
 
         Returns
         -------
+        Tuple[str, Optional[str]]
+            Кортеж: (сгенерированный ответ от API чат-модели, причина завершения генерации).
+        """
+        pass
+
+    @abstractmethod
+    def generate_full_response(
+        self,
+        system_prompt: str,
+        initial_user_message: str,
+        model_name: str,
+        max_tokens_per_chunk: int,
+        temperature: float,
+        max_continuation_attempts: int = 3,
+        continuation_prompt_template: str = "Please continue exactly from where it left off.",
+    ) -> str:
+        """
+        Отправляет начальное сообщение и, при необходимости, автоматически обрабатывает
+        продолжения для получения полного ответа от LLM, если ответ обрывается из-за лимита токенов.
+
+        Агрегирует статистику по токенам за все вызовы.
+
+        Parameters
+        ----------
+        system_prompt : str
+            Системный промпт.
+        initial_user_message : str
+            Начальное сообщение от пользователя.
+        model_name : str
+            Название модели.
+        max_tokens_per_chunk : int
+            Максимальное количество токенов для генерации в каждом отдельном запросе к API.
+        temperature : float
+            Температура генерации.
+        max_continuation_attempts : int, optional
+            Максимальное количество попыток продолжить генерацию, по умолчанию 3.
+        continuation_prompt_template : str, optional
+            Шаблон промпта для запроса продолжения.
+            По умолчанию используется шаблон, просящий продолжить с места обрыва.
+
+        Returns
+        -------
         str
-            Сгенерированный ответ от LLM API.
+            Полный (насколько возможно) сгенерированный ответ.
         """
         pass
