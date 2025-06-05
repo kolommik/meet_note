@@ -36,13 +36,13 @@ class AnthropicChatStrategy(BaseChatModelStrategy):
         super().__init__(api_key)
         self.models = [
             Model(
-                name="claude-sonnet-4-latest",
+                name="claude-sonnet-4-0",
                 output_max_tokens=32_000,
                 price_input=3.0,
                 price_output=15.0,
             ),
             Model(
-                name="claude-opus-4-latest",
+                name="claude-opus-4-0",
                 output_max_tokens=32_000,
                 price_input=15.0,
                 price_output=75.0,

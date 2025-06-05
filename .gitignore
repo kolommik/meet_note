@@ -179,3 +179,4 @@ data/*.mp3
 data/*.txt
 data/*.json
 data/*.md
+tests/*.*
