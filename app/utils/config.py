@@ -25,11 +25,8 @@ class AppConfig:
 
     # Настройки по умолчанию для LLM
     default_llm_provider: str = "Anthropic"
-    default_temperature: float = 0.0
-    default_max_tokens: int = 4096
-
-    # Настройки для транскрипции (Не используется)
-    max_speakers: int = 10
+    default_temperature: float = 0.1
+    default_max_tokens: int = 8192
 
     # Доступные LLM провайдеры
     available_providers: List[str] = field(default_factory=list)

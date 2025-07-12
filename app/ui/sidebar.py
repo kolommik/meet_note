@@ -58,15 +58,6 @@ def display_llm_settings():
     ):
         st.sidebar.subheader("Настройки моделей LLM")
 
-        # Если настройки еще не инициализированы, создаем их
-        if "llm_settings" not in st.session_state:
-            st.session_state.llm_settings = {
-                "temperature": 0.0,
-                "max_tokens": 4096,
-                "provider": None,
-                "model": None,
-            }
-
         # Если конфигурация не инициализирована в session_state, инициализируем
         config = st.session_state.config
 
@@ -138,16 +129,22 @@ def display_llm_settings():
             min_value=0.0,
             max_value=1.0,
             value=st.session_state.llm_settings.get("temperature", 0.0),
-            step=0.01,
+            step=0.1,
             help="Регулирует случайность генерации. Низкие значения делают ответ более детерминированным.",
         )
 
         # Поле для ввода максимального количества токенов
+
+        model_max_tokens = llm_strategy.get_output_max_tokens(model)
+        model_min_tokens = 4096
+        model_current_tokens = st.session_state.llm_settings.get("max_tokens", 4096)
+        if model_current_tokens > model_max_tokens:
+            model_current_tokens = model_max_tokens
         st.session_state.llm_settings["max_tokens"] = st.sidebar.number_input(
             "Макс. токенов",
-            min_value=1024,
-            max_value=8192,
-            value=st.session_state.llm_settings.get("max_tokens", 4096),
+            min_value=model_min_tokens,
+            max_value=model_max_tokens,
+            value=model_current_tokens,
             step=512,
             help="Максимальное количество токенов в ответе LLM",
         )
