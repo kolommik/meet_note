@@ -166,7 +166,7 @@ def display_llm_stats():
     # Получаем общую статистику
     total_stats = get_total_llm_stats()
 
-    if st.sidebar.toggle("Метрики", key="full_price_toggle"):
+    if st.sidebar.toggle("Метрики", value=True, key="full_price_toggle"):
         st.sidebar.metric("Полная стоимость", f"{100*total_stats['total_cost']:.4f}¢")
 
     if "llm_stats" in st.session_state and st.sidebar.toggle(
