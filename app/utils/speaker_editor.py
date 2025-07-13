@@ -142,12 +142,15 @@ def _display_speaker_editor_impl(
     speakers_data = []
     for speaker_id, speaker_info in analysis_results.get("speakers", {}).items():
         if "statistics" in speaker_info:
+            speaker_name = speaker_info.get("name", speaker_id)
+            if speaker_name == "Неизвестно":
+                speaker_name = speaker_id
             percentage = speaker_info["statistics"].get("percentage", 0)
             speakers_data.append(
                 {
                     "id": speaker_id,
                     "percentage": percentage,
-                    "llm_name": speaker_info.get("name", "Неизвестно"),
+                    "llm_name": speaker_name,
                     "role": speaker_info.get("role", "Не определена"),
                     "confidence": speaker_info.get("confidence", "низкая"),
                     "word_count": speaker_info["statistics"].get("word_count", 0),
