@@ -143,11 +143,12 @@ def _display_correction_editor_impl(
             # Колонка с чекбоксом для выбора
             with col1:
                 selected = st.checkbox(
-                    "",
+                    f"Выбрать исправление: {original_text} -> {corrected_text}",
                     value=st.session_state.selected_corrections.get(
                         original_text, True
                     ),
                     key=f"select_{idx}",
+                    label_visibility="collapsed",
                 )
                 st.session_state.selected_corrections[original_text] = selected
 
