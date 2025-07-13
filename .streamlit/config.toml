@@ -1,0 +1,4 @@
+[server]
+port = 8512
+sslCertFile = "D:/mkcert/192.168.1.70+1.pem"
+sslKeyFile = "D:/mkcert/192.168.1.70+1-key.pem"
