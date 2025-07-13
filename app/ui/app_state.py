@@ -45,10 +45,6 @@ def initialize_app_state():
     if "meeting_summary_path" not in st.session_state:
         st.session_state.meeting_summary_path = None
 
-    # LLM настройки
-    if "llm_settings" not in st.session_state:
-        st.session_state.llm_settings = {"temperature": 0.0, "max_tokens": 2048}
-
     # Инициализируем статистику LLM
     initialize_llm_stats()
 

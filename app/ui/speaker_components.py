@@ -122,8 +122,8 @@ def _define_speakers_with_llm(transcript_text, speaker_stats, llm_strategy, mode
     """Анализ транскрипции с помощью LLM"""
     # Получаем настройки LLM из session_state или используем значения по умолчанию
     llm_settings = get_state("llm_settings", {})
-    temperature = llm_settings.get("temperature", 0.0)
-    max_tokens = llm_settings.get("max_tokens", 2048)
+    temperature = llm_settings.get("temperature")
+    max_tokens = llm_settings.get("max_tokens")
 
     # Запускаем анализ с помощью LLM с параметрами из настроек
     analysis_results = identify_speakers_with_llm(

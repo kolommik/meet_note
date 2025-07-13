@@ -31,8 +31,8 @@ def render_document_controls():
     llm_settings = get_state("llm_settings", {})
     model_name = llm_settings.get("model")
     llm_strategy = llm_settings.get("strategy")
-    temperature = llm_settings.get("temperature", 0.0)
-    max_tokens = llm_settings.get("max_tokens", 2048)
+    temperature = llm_settings.get("temperature")
+    max_tokens = llm_settings.get("max_tokens")
 
     transcript_text = get_state("corrected_transcript") or get_state(
         "speaker_updated_transcript"
