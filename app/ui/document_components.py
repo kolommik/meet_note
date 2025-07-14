@@ -139,7 +139,7 @@ def render_document_content():
         col1, col2, _ = st.columns([1, 1, 1])
         with col1:
             if summary_doc_path:
-                create_download_button(summary_doc, f"{file_base_name}_summary.md")
+                create_download_button(summary_doc, f"{file_base_name}.md")
         with col2:
             copy_button(summary_doc)
         st.markdown(summary_doc)
