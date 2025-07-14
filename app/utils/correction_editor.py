@@ -117,6 +117,9 @@ def _display_correction_editor_impl(
 
     # Создаем форму для редактирования исправлений
     with st.form("correction_edit_form"):
+        # Кнопка для применения исправлений
+        submit_button = st.form_submit_button("Применить исправления к транскрипции")
+
         # Заголовки столбцов
         col1, col2, col3, col4 = st.columns([0.1, 0.35, 0.35, 0.2])
         with col1:
@@ -195,9 +198,6 @@ def _display_correction_editor_impl(
             # Отделяющая линия между исправлениями
             if idx < len(corrections) - 1:
                 st.markdown("---")
-
-        # Кнопка для применения исправлений
-        submit_button = st.form_submit_button("Применить исправления к транскрипции")
 
     # Если кнопка нажата, обновляем транскрипцию
     if submit_button:
